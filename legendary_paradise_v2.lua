@@ -1,11 +1,11 @@
-print("[LP] v2.4 loading...")
+print("[LP] v2.5 loading...")
 local Players=game:GetService("Players")
 local RS=game:GetService("ReplicatedStorage")
 local WS=game:GetService("Workspace")
 local LP=Players.LocalPlayer
 local DL={}
 local function dlog(m) local s="["..string.format("%.1f",os.clock()).."] "..tostring(m);table.insert(DL,s);print("[LP] "..tostring(m)) end
-dlog("=== LP v2.4 ===")
+dlog("=== LP v2.5 ===")
 local Items,Cases,LevelCalc,Rarities,UpgMod
 pcall(function()
  local M=RS:FindFirstChild("Modules") or RS:WaitForChild("Modules",3)
@@ -28,7 +28,7 @@ if Rem then
  abR=Rem:FindFirstChild("AddBot")
  upR=Rem:FindFirstChild("Upgrade")
  urR=Rem:FindFirstChild("UpdateRewards")
- dlog("Remotes: OC="..(ocR and ocR.ClassName or "X").." Sell="..(slR and slR.ClassName or "X").." Up="..(upR and upR.ClassName or "X"))
+ dlog("Remotes OK")
 end
 local function gInv()
  local pd=LP:FindFirstChild("PlayerData")
@@ -69,8 +69,10 @@ end
 local function getWear(item) local w=nil;pcall(function() w=item:GetAttribute("Wear") end);return w end
 local function getST(item) local s=false;pcall(function() s=item:GetAttribute("Stattrak")==true end);return s end
 local function getUUID(item) local u=nil;pcall(function() u=item:GetAttribute("UUID") end);return u end
+local function getItemAttrs(item)
+ local t={};pcall(function() for k,v in pairs(item:GetAttributes()) do t[k]=v end end);return t
+end
 local spyLog={}
-local _origInvoke,_origFire
 pcall(function()
  local mt=getrawmetatable(game)
  if mt and setreadonly then
@@ -81,44 +83,23 @@ pcall(function()
    if (method=="InvokeServer" or method=="FireServer") and self.Parent==Rem then
     local args={...}
     local aStr={}
-    for i2,a in ipairs(args) do
+    for _,a in ipairs(args) do
      if type(a)=="table" then
-      local ts={}
-      for k,v in pairs(a) do table.insert(ts,tostring(k).."="..tostring(v)) end
-      table.insert(aStr,"t{"..table.concat(ts,",").."}")
+      local ts={};for k,v in pairs(a) do
+       if type(v)=="table" then table.insert(ts,tostring(k).."=tbl{"..#v.."}")
+       else table.insert(ts,tostring(k).."="..tostring(v)) end
+      end
+      table.insert(aStr,"t{"..table.concat(ts,", ").."}")
      else table.insert(aStr,type(a)..":"..tostring(a)) end
     end
-    local entry="[SPY] "..self.Name.."."..method.."("..table.concat(aStr,", ")..")"
-    table.insert(spyLog,entry);dlog(entry)
+    local entry=self.Name.."."..method.."("..table.concat(aStr,", ")..")"
+    table.insert(spyLog,entry);dlog("[SPY] "..entry)
    end
    return oldNC(self,...)
   end)
   setreadonly(mt,true)
-  dlog("SPY: namecall hooked")
- else dlog("SPY: no getrawmetatable") end
-end)
-pcall(function()
- if hookfunction and ocR then
-  _origInvoke=ocR.InvokeServer
- end
-end)
-dlog("--- Cases Module Dump (3) ---")
-pcall(function()
- if Cases then
-  local n=0
-  for id,d in pairs(Cases) do
-   if n>=3 then break end
-   if type(d)=="table" then
-    n=n+1
-    local fields={}
-    for k,v in pairs(d) do
-     if type(v)~="table" then table.insert(fields,tostring(k).."="..tostring(v))
-     else table.insert(fields,tostring(k).."={...}") end
-    end
-    dlog("Case["..tostring(id).."]: "..table.concat(fields,", "))
-   else dlog("Case["..tostring(id).."]: "..type(d).."="..tostring(d)) end
-  end
- end
+  dlog("SPY hooked")
+ else dlog("SPY: no rawmetatable") end
 end)
 dlog("--- Inv ---")
 pcall(function()
@@ -126,7 +107,7 @@ pcall(function()
  if inv then
   local ch=inv:GetChildren();dlog("Inv: "..#ch.." items")
   for i=1,math.min(5,#ch) do
-   local it=ch[i];dlog("  "..it.ClassName..": "..it.Name.." UUID="..tostring(getUUID(it)).." $"..gPrice(it).." W="..(getWear(it) or "?").." ST="..tostring(getST(it)))
+   local it=ch[i];dlog("  "..it.Name.." $"..gPrice(it).." UUID="..tostring(getUUID(it)).." W="..(getWear(it) or "?").." ST="..tostring(getST(it)).." Lk="..tostring(it:GetAttribute("Locked") or false))
   end
  else dlog("No inv") end
 end)
@@ -149,97 +130,26 @@ _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.
 _G.LP_BATTLE_BUDGET=500;_G.LP_BATTLE_MIN_BAL=100
 _G.LP_BATTLE_MODE="CRAZY TERMINAL";_G.LP_BATTLE_CASES={}
 local st={sessions=0,casesOpened=0,earned=0,sold=0,upgAttempts=0,upgWins=0,upgLosses=0,upgProfit=0,upgSpent=0,battlesPlayed=0,battlesWon=0,battlesLost=0,battleProfit=0}
-local function tryOpenCase(cid)
- if not ocR then dlog("OC: nil");return false end
- dlog("OC: cid="..tostring(cid).." type="..type(cid))
- local cData=nil
- if Cases and Cases[cid] then cData=Cases[cid] end
- local invBefore=0
- pcall(function() local inv=gInv();if inv then invBefore=#inv:GetChildren() end end)
- local bal1=gBal()
- local patterns={}
- table.insert(patterns,{"raw",{cid}})
- if type(cid)=="string" then
-  table.insert(patterns,{"num",{tonumber(cid)}})
- end
- if type(cid)=="number" then
-  table.insert(patterns,{"str",{tostring(cid)}})
- end
- if cData then
-  if cData.Name then table.insert(patterns,{"Name",{cData.Name}}) end
-  if cData.Id then table.insert(patterns,{"Id",{cData.Id}}) end
-  if cData.CaseId then table.insert(patterns,{"CaseId",{cData.CaseId}}) end
- end
- table.insert(patterns,{"{Case=}",{{Case=cid}}})
- table.insert(patterns,{"{CaseId=}",{{CaseId=cid}}})
- if cData and cData.Name then
-  table.insert(patterns,{"{Case=Name}",{{Case=cData.Name}}})
- end
- table.insert(patterns,{"1,cid",{1,cid}})
- for _,p in ipairs(patterns) do
-  local label=p[1];local args=p[2]
-  local argStr={}
-  for _,a in ipairs(args) do
-   if type(a)=="table" then local ts={};for k,v in pairs(a) do table.insert(ts,k.."="..tostring(v)) end;table.insert(argStr,"{"..table.concat(ts,",").."}")
-   else table.insert(argStr,type(a)..":"..tostring(a)) end
-  end
-  local ok,r=pcall(function() return ocR:InvokeServer(unpack(args)) end)
-  dlog("  OC["..label.."]("..table.concat(argStr,",").."): ok="..tostring(ok).." r="..tostring(r))
-  wait(0.4)
-  local bal2=gBal()
-  if bal2~=bal1 then dlog("  >> OC["..label.."] WORKED bal "..tostring(bal1).."->"..tostring(bal2));return true,label end
-  local invAfter=0
-  pcall(function() local inv=gInv();if inv then invAfter=#inv:GetChildren() end end)
-  if invAfter>invBefore then dlog("  >> OC["..label.."] WORKED inv "..invBefore.."->"..invAfter);return true,label end
- end
- return false,"no change"
+local function openCase(cid)
+ if not ocR then return false end
+ local ok,r=pcall(function() return ocR:InvokeServer(cid,1,false,false) end)
+ dlog("OC("..tostring(cid).."): ok="..tostring(ok).." r="..tostring(r))
+ return ok and r~=false
 end
-local function trySellItem(item)
- if not slR then dlog("Sell: nil");return false end
- local n=item.Name
- local w=getWear(item)
- local st2=getST(item)
- local uuid=getUUID(item)
- dlog("Sell: "..n.." w="..(w or "nil").." st="..tostring(st2).." uuid="..(uuid or "nil"))
- local bal1=gBal()
- local invBefore=0
- pcall(function() local inv=gInv();if inv then invBefore=#inv:GetChildren() end end)
- local patterns={}
- if uuid then
-  table.insert(patterns,{"uuid",{uuid}})
-  table.insert(patterns,{"{uuid}",{{uuid}}})
-  table.insert(patterns,{"{UUID=}",{{UUID=uuid}}})
-  table.insert(patterns,{"{UUID=,Name=}",{{UUID=uuid,Name=n}}})
- end
- table.insert(patterns,{"name",{n}})
- table.insert(patterns,{"n,w",{n,w}})
- table.insert(patterns,{"n,w,st",{n,w,st2}})
- table.insert(patterns,{"{N,W,S}",{{Name=n,Wear=w,Stattrak=st2}}})
- table.insert(patterns,{"inst",{item}})
- table.insert(patterns,{"{n}",{{n}}})
- if uuid then
-  table.insert(patterns,{"n,uuid",{n,uuid}})
-  table.insert(patterns,{"uuid,1",{uuid,1}})
- end
- for _,p in ipairs(patterns) do
-  local label=p[1];local args=p[2]
-  local argStr={}
-  for _,a in ipairs(args) do
-   if type(a)=="table" then local ts={};for k,v in pairs(a) do table.insert(ts,tostring(k).."="..tostring(v)) end;table.insert(argStr,"{"..table.concat(ts,",").."}")
-   elseif type(a)=="userdata" then table.insert(argStr,"inst:"..tostring(a))
-   else table.insert(argStr,type(a)..":"..tostring(a)) end
-  end
-  local ok,r=pcall(function() return slR:InvokeServer(unpack(args)) end)
-  dlog("  S["..label.."]("..table.concat(argStr,",").."): ok="..tostring(ok).." r="..tostring(r))
-  wait(0.4)
-  local bal2=gBal()
-  if bal2>bal1 then dlog("  >> S["..label.."] WORKED +"..tostring(bal2-bal1));return true,label end
-  local invAfter=0
-  pcall(function() local inv=gInv();if inv then invAfter=#inv:GetChildren() end end)
-  if invAfter<invBefore then dlog("  >> S["..label.."] WORKED inv "..invBefore.."->"..invAfter);return true,label end
- end
- dlog("  Sell FAILED all")
- return false
+local function buildSellEntry(item)
+ local a=getItemAttrs(item)
+ return {Name=item.Name,UUID=a.UUID,Wear=a.Wear,Stattrak=a.Stattrak or false,TimeObtained=a.TimeObtained or 0,Serial=a.Serial or 0,Numbered=a.Numbered or false,Locked=a.Locked or false,Escrow=a.Escrow or false,JackpotEscrow=a.JackpotEscrow or false,JackpotRoundId=a.JackpotRoundId or ""}
+end
+local function sellItems(items)
+ if not slR then return false end
+ local batch={}
+ for _,item in ipairs(items) do table.insert(batch,buildSellEntry(item)) end
+ local ok,r=pcall(function() return slR:InvokeServer(batch) end)
+ dlog("Sell("..#batch.."): ok="..tostring(ok).." r="..tostring(r))
+ return ok
+end
+local function sellOne(item)
+ return sellItems({item})
 end
 pcall(function()
  if game:GetService("CoreGui"):FindFirstChild("LegendaryParadiseUI") then game:GetService("CoreGui").LegendaryParadiseUI:Destroy() end
@@ -256,7 +166,7 @@ mn.Parent=sg;pcall(function() Instance.new("UICorner",mn).CornerRadius=UDim.new(
 local topb=Instance.new("Frame");topb.Size=UDim2.new(1,0,0,30);topb.BackgroundColor3=C.tb;topb.BorderSizePixel=0;topb.Parent=mn
 pcall(function() Instance.new("UICorner",topb).CornerRadius=UDim.new(0,10) end)
 local tbf=Instance.new("Frame",topb);tbf.Size=UDim2.new(1,0,0,10);tbf.Position=UDim2.new(0,0,1,-10);tbf.BackgroundColor3=C.tb;tbf.BorderSizePixel=0
-local tl=Instance.new("TextLabel");tl.Size=UDim2.new(1,-70,1,0);tl.Position=UDim2.new(0,10,0,0);tl.BackgroundTransparency=1;tl.Text="LP v2.4 DEBUG";tl.TextColor3=C.ac;tl.TextSize=12;tl.Font=Enum.Font.GothamBold;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Parent=topb
+local tl=Instance.new("TextLabel");tl.Size=UDim2.new(1,-70,1,0);tl.Position=UDim2.new(0,10,0,0);tl.BackgroundTransparency=1;tl.Text="LP v2.5";tl.TextColor3=C.ac;tl.TextSize=12;tl.Font=Enum.Font.GothamBold;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Parent=topb
 local xb=Instance.new("TextButton");xb.Size=UDim2.new(0,24,0,20);xb.Position=UDim2.new(1,-30,0,5);xb.BackgroundColor3=C.rd;xb.Text="X";xb.TextColor3=C.tw;xb.TextSize=11;xb.Font=Enum.Font.GothamBold;xb.BorderSizePixel=0;xb.Parent=topb
 pcall(function() Instance.new("UICorner",xb).CornerRadius=UDim.new(0,5) end)
 xb.MouseButton1Click:Connect(function() sg:Destroy() end)
@@ -307,8 +217,7 @@ local logQ,logLbl={},nil
 local function log(m) dlog(m);table.insert(logQ,tostring(m));if #logQ>10 then table.remove(logQ,1) end;if logLbl then logLbl.Text=table.concat(logQ,"\n") end end
 pcall(function()
  local pg=tP["Dash"]
- mSec(pg,"LEGENDARY PARADISE v2.4",1)
- mLbl(pg,"UUID-based + Remote Spy",2)
+ mSec(pg,"LEGENDARY PARADISE v2.5",1)
  mSec(pg,"PLAYER",3);local il=mLbl(pg,"...",4)
  mSec(pg,"STATS",7);local sl=mLbl(pg,"...",8)
  mSec(pg,"LIVE LOG",9)
@@ -333,10 +242,10 @@ pcall(function()
  local fcBs={}
  for idx,e in ipairs(acn) do
   local sel=(e.id==_G.LP_FARM_CASE)
-  local fb=Instance.new("TextButton");fb.Size=UDim2.new(1,-4,0,16);fb.BackgroundColor3=sel and C.ac or C.cd;fb.Text="["..tostring(e.id).."] "..e.name..(e.price>0 and(" $"..e.price) or " FREE");fb.TextColor3=sel and Color3.fromRGB(0,0,0) or C.tx;fb.TextSize=8;fb.Font=Enum.Font.Gotham;fb.TextXAlignment=Enum.TextXAlignment.Left;fb.BorderSizePixel=0;fb.LayoutOrder=idx;fb.Parent=fcs
+  local fb=Instance.new("TextButton");fb.Size=UDim2.new(1,-4,0,16);fb.BackgroundColor3=sel and C.ac or C.cd;fb.Text=e.name..(e.price>0 and(" $"..e.price) or " FREE");fb.TextColor3=sel and Color3.fromRGB(0,0,0) or C.tx;fb.TextSize=8;fb.Font=Enum.Font.Gotham;fb.TextXAlignment=Enum.TextXAlignment.Left;fb.BorderSizePixel=0;fb.LayoutOrder=idx;fb.Parent=fcs
   pcall(function() Instance.new("UICorner",fb).CornerRadius=UDim.new(0,4) end)
   fcBs[e.id]=fb
-  fb.MouseButton1Click:Connect(function() _G.LP_FARM_CASE=e.id;fcl.Text="Case: "..e.name.." (id="..tostring(e.id)..")";for k,v in pairs(fcBs) do if k==e.id then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
+  fb.MouseButton1Click:Connect(function() _G.LP_FARM_CASE=e.id;fcl.Text="Case: "..e.name;for k,v in pairs(fcBs) do if k==e.id then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
  end
  mSec(pg,"AUTO SELL",10);mTog(pg,"Auto Sell","LP_SELL",C.or2,11)
  mInput(pg,"Keep above $",500,"LP_KEEP_ABOVE_PRICE",12)
@@ -349,7 +258,7 @@ end)
 pcall(function()
  local pg=tP["Battle"]
  local acn2={}
- if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Name then table.insert(acn2,{id=id,name=d.Name,price=d.Price or 0}) end end;table.sort(acn2,function(a,b) return a.price<b.price end) end
+ if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Name and d.ForBattles then table.insert(acn2,{id=id,name=d.Name,price=d.Price or 0}) end end;table.sort(acn2,function(a,b) return a.price<b.price end) end
  local bm={"CLASSIC","TERMINAL","CRAZY TERMINAL","SHARED","JESTER","JACKPOT","CRAZY JACKPOT"}
  mSec(pg,"CASES (multi)",1)
  local scl=mLbl(pg,"Selected: 0",2);scl.TextColor3=C.ac
@@ -360,7 +269,7 @@ pcall(function()
  local cL=Instance.new("UIListLayout");cL.SortOrder=Enum.SortOrder.LayoutOrder;cL.Padding=UDim.new(0,1);cL.Parent=csc
  local cBs={}
  for idx,e in ipairs(acn2) do
-  local cb=Instance.new("TextButton");cb.Size=UDim2.new(1,-4,0,18);cb.BackgroundColor3=C.cd;cb.Text="["..tostring(e.id).."] "..e.name..(e.price>0 and(" $"..e.price) or " FREE");cb.TextColor3=C.tx;cb.TextSize=8;cb.Font=Enum.Font.Gotham;cb.TextXAlignment=Enum.TextXAlignment.Left;cb.BorderSizePixel=0;cb.LayoutOrder=idx;cb.Parent=csc
+  local cb=Instance.new("TextButton");cb.Size=UDim2.new(1,-4,0,18);cb.BackgroundColor3=C.cd;cb.Text=e.name.." $"..e.price;cb.TextColor3=C.tx;cb.TextSize=8;cb.Font=Enum.Font.Gotham;cb.TextXAlignment=Enum.TextXAlignment.Left;cb.BorderSizePixel=0;cb.LayoutOrder=idx;cb.Parent=csc
   pcall(function() Instance.new("UICorner",cb).CornerRadius=UDim.new(0,4) end)
   table.insert(cBs,{btn=cb,name=e.name,id=e.id})
   cb.MouseButton1Click:Connect(function()
@@ -409,7 +318,6 @@ end)
 pcall(function()
  local pg=tP["Upgr"]
  mSec(pg,"UPGRADER",1);mTog(pg,"Auto Upgrader","LP_UPGRADER",C.or2,2)
- mLbl(pg,"Upgrade = RemoteEvent (FireServer)",3)
  mSec(pg,"MULT",4)
  local mBs2={};local mr2=Instance.new("Frame");mr2.Size=UDim2.new(1,0,0,22);mr2.BackgroundTransparency=1;mr2.LayoutOrder=5;mr2.Parent=pg
  for i,m in ipairs({2,3,5,10}) do
@@ -427,12 +335,9 @@ pcall(function()
 end)
 pcall(function()
  local pg=tP["Exploit"]
- mSec(pg,"CLIENT",1)
- mBtn(pg,"Money $999k",C.bl,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local b=c and c:FindFirstChild("Balance");if b then b.Value=999999;log("$999k") end end) end,2)
- mBtn(pg,"Tickets 9999",C.pu,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local t=c and c:FindFirstChild("Tickets");if t then t.Value=9999;log("Tix") end end) end,3)
- mSec(pg,"DUPE",5)
- mBtn(pg,"Dupe x1",C.or2,function() local inv=gInv();if not inv then log("No inv");return end;local n=0;for _,i in ipairs(inv:GetChildren()) do if not i:GetAttribute("LPDup") then local cl=i:Clone();cl:SetAttribute("LPDup",true);cl.Parent=inv;n=n+1 end end;log("Duped "..n) end,6)
- mBtn(pg,"Remove Dupes",C.rd,function() local inv=gInv();if not inv then return end;local n=0;for _,i in ipairs(inv:GetChildren()) do if i:GetAttribute("LPDup") then i:Destroy();n=n+1 end end;log("Rm "..n) end,7)
+ mSec(pg,"CLIENT-SIDE (visual only)",1)
+ mBtn(pg,"Money $999k (visual)",C.bl,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local b=c and c:FindFirstChild("Balance");if b then b.Value=999999;log("$999k visual") end end) end,2)
+ mBtn(pg,"Tickets 9999 (visual)",C.pu,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and c:FindFirstChild("Currencies");local t=c and c:FindFirstChild("Tickets");if t then t.Value=9999;log("Tix visual") end end) end,3)
 end)
 local dbgBox
 pcall(function()
@@ -443,120 +348,103 @@ pcall(function()
  pcall(function() Instance.new("UICorner",dbgF).CornerRadius=UDim.new(0,6) end)
  dbgBox=Instance.new("TextBox");dbgBox.Size=UDim2.new(1,-6,1,-6);dbgBox.Position=UDim2.new(0,3,0,3);dbgBox.BackgroundTransparency=1;dbgBox.Text=table.concat(DL,"\n");dbgBox.TextColor3=Color3.fromRGB(0,255,100);dbgBox.TextSize=7;dbgBox.Font=Enum.Font.Code;dbgBox.TextXAlignment=Enum.TextXAlignment.Left;dbgBox.TextYAlignment=Enum.TextYAlignment.Top;dbgBox.TextWrapped=true;dbgBox.ClearTextOnFocus=false;dbgBox.MultiLine=true;dbgBox.TextEditable=false;dbgBox.Parent=dbgF
  mBtn(pg,"REFRESH",C.bl,function() dbgBox.Text=table.concat(DL,"\n") end,4)
- mSec(pg,"STEP 1: SPY on real game",5)
- mLbl(pg,"Open a case / sell item MANUALLY then REFRESH",6)
- mBtn(pg,"Show SPY log",C.pu,function()
-  dlog("=== SPY LOG ("..#spyLog..") ===")
-  for _,e in ipairs(spyLog) do dlog(e) end
-  dlog("=== END SPY ===")
-  dbgBox.Text=table.concat(DL,"\n")
+ mBtn(pg,"Show SPY (non-Cooldown)",C.pu,function()
+  dlog("=== SPY ===")
+  for _,e in ipairs(spyLog) do if not string.find(e,"CheckCooldown") then dlog("[S] "..e) end end
+  dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
+ end,5)
+ mSec(pg,"TESTS",6)
+ mBtn(pg,"TEST: Open Group case",C.gn,function()
+  dlog("=== TEST OC Group ===")
+  local bal1=gBal();local invB=0;pcall(function() invB=#gInv():GetChildren() end)
+  openCase("Group")
+  wait(1)
+  local bal2=gBal();local invA=0;pcall(function() invA=#gInv():GetChildren() end)
+  dlog("Bal:"..bal1.."->"..bal2.." Inv:"..invB.."->"..invA)
+  dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
  end,7)
- mSec(pg,"STEP 2: Test patterns",8)
- mBtn(pg,"TEST: Open Free",C.gn,function()
-  dlog("=== TEST FREE ===")
-  local ok,ret=tryOpenCase("Free")
-  dlog("Result: "..tostring(ok).." "..tostring(ret))
+ mBtn(pg,"TEST: Open Free case",C.gn,function()
+  dlog("=== TEST OC Free ===")
+  local bal1=gBal();local invB=0;pcall(function() invB=#gInv():GetChildren() end)
+  openCase("Free")
+  wait(1)
+  local bal2=gBal();local invA=0;pcall(function() invA=#gInv():GetChildren() end)
+  dlog("Bal:"..bal1.."->"..bal2.." Inv:"..invB.."->"..invA)
   dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,9)
- mBtn(pg,"TEST: Open case #1 (numeric)",C.gn,function()
-  dlog("=== TEST #1 ===")
-  local ok,ret=tryOpenCase(1)
-  dlog("Result: "..tostring(ok).." "..tostring(ret))
-  dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,10)
- mBtn(pg,"TEST: Sell cheapest (UUID)",C.or2,function()
+ end,8)
+ mBtn(pg,"TEST: Sell cheapest (table)",C.or2,function()
   dlog("=== TEST SELL ===")
   local inv=gInv();if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
   local best=nil;local bp=math.huge
   for _,it in ipairs(inv:GetChildren()) do
-   if not it:GetAttribute("Locked") then
-    local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end
+   if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end end
+  end
+  if not best then dlog("No unlocked item");dbgBox.Text=table.concat(DL,"\n");return end
+  dlog("Target: "..best.Name.." $"..bp.." UUID="..tostring(getUUID(best)))
+  local entry=buildSellEntry(best)
+  local eStr={};for k,v in pairs(entry) do table.insert(eStr,k.."="..tostring(v)) end
+  dlog("Entry: "..table.concat(eStr,", "))
+  local bal1=gBal();local invB=#inv:GetChildren()
+  local ok,r=pcall(function() return slR:InvokeServer({entry}) end)
+  dlog("Sell({entry}): ok="..tostring(ok).." r="..tostring(r))
+  wait(0.5)
+  local bal2=gBal();local invA=#inv:GetChildren()
+  dlog("Bal:"..bal1.."->"..bal2.." Inv:"..invB.."->"..invA)
+  if bal2>bal1 or invA<invB then dlog(">> SELL WORKED!") else
+   dlog("Trying alt patterns...")
+   local ok2,r2=pcall(function() return slR:InvokeServer({{UUID=getUUID(best)}}) end)
+   dlog("S({UUID}): ok="..tostring(ok2).." r="..tostring(r2))
+   wait(0.5);local bal3=gBal();local invA2=#inv:GetChildren()
+   dlog("Bal:"..bal2.."->"..bal3.." Inv:"..invA.."->"..invA2)
+   if bal3>bal2 or invA2<invA then dlog(">> UUID-only WORKED!") else
+    local ok3,r3=pcall(function() return slR:InvokeServer({{Name=best.Name,Wear=getWear(best),UUID=getUUID(best),Stattrak=getST(best)}}) end)
+    dlog("S({N,W,U,S}): ok="..tostring(ok3).." r="..tostring(r3))
+    wait(0.5);local bal4=gBal();local invA3=#inv:GetChildren()
+    dlog("Bal:"..bal3.."->"..bal4.." Inv:"..invA2.."->"..invA3)
+    if bal4>bal3 or invA3<invA2 then dlog(">> N,W,U,S WORKED!") else dlog("ALL SELL FAILED") end
    end
   end
-  if best then dlog("Target: "..best.Name.." $"..bp.." uuid="..tostring(getUUID(best)));trySellItem(best)
-  else dlog("No unlocked sellable item") end
   dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,11)
+ end,9)
  mBtn(pg,"TEST: Upgrade cheapest",C.pu,function()
   dlog("=== TEST UPGRADE ===")
-  if not upR then dlog("upR nil");dbgBox.Text=table.concat(DL,"\n");return end
+  if not upR then dlog("No upR");dbgBox.Text=table.concat(DL,"\n");return end
   local inv=gInv();if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
   local best=nil;local bp=math.huge
-  for _,it in ipairs(inv:GetChildren()) do
-   if not it:GetAttribute("Locked") then
-    local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end
-   end
-  end
+  for _,it in ipairs(inv:GetChildren()) do if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end end end
   if not best then dlog("No item");dbgBox.Text=table.concat(DL,"\n");return end
   local uuid=getUUID(best)
-  dlog("Upgrading: "..best.Name.." $"..bp.." uuid="..(uuid or "nil").." x2")
-  local bal1=gBal()
-  local invB=0;pcall(function() invB=#gInv():GetChildren() end)
-  local tryPatterns={
+  dlog("Upg: "..best.Name.." $"..bp.." uuid="..(uuid or "nil"))
+  local bal1=gBal();local invB=#inv:GetChildren()
+  local tries={
+   {"uuid,2",function() upR:FireServer(uuid,2) end},
    {"inst,2",function() upR:FireServer(best,2) end},
    {"name,2",function() upR:FireServer(best.Name,2) end},
-   {"uuid,2",function() if uuid then upR:FireServer(uuid,2) end end},
-   {"n,w,2",function() upR:FireServer(best.Name,getWear(best),2) end},
-   {"{tbl},2",function() upR:FireServer({Name=best.Name,Wear=getWear(best),UUID=uuid},2) end},
-   {"uuid,mult",function() if uuid then upR:FireServer(uuid,"2x") end end},
+   {"{entry},2",function() upR:FireServer(buildSellEntry(best),2) end},
   }
-  for _,tp in ipairs(tryPatterns) do
-   local ok,r=pcall(tp[2])
-   dlog("  Up["..tp[1].."]: ok="..tostring(ok).." r="..tostring(r))
-   wait(1)
-  end
-  local bal2=gBal()
-  local invA=0;pcall(function() invA=#gInv():GetChildren() end)
-  dlog("Bal: "..tostring(bal1).."->"..tostring(bal2).." Inv:"..invB.."->"..invA)
+  for _,t in ipairs(tries) do local ok,r=pcall(t[2]);dlog("  Up["..t[1].."]: ok="..tostring(ok));wait(1) end
+  local bal2=gBal();local invA=#inv:GetChildren()
+  dlog("Bal:"..bal1.."->"..bal2.." Inv:"..invB.."->"..invA)
   dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,12)
- mSec(pg,"DUMPS",13)
- mBtn(pg,"DUMP Cases Module (5)",C.or2,function()
-  dlog("=== CASES DUMP ===")
-  if not Cases then dlog("No Cases module");dbgBox.Text=table.concat(DL,"\n");return end
-  local n=0
-  for id,d in pairs(Cases) do
-   if n>=5 then break end
-   if type(d)=="table" then
-    n=n+1;dlog("Case KEY="..tostring(id).." type(key)="..type(id))
-    for k,v in pairs(d) do
-     if type(v)=="table" then
-      local sub={};local c2=0
-      for sk,sv in pairs(v) do c2=c2+1;if c2<=3 then table.insert(sub,tostring(sk).."="..tostring(sv)) end end
-      dlog("  "..tostring(k).."={"..(table.concat(sub,","))..(c2>3 and ",..." or "").."}")
-     else dlog("  "..tostring(k).."="..tostring(v)) end
-    end
-   end
-  end
+ end,10)
+ mBtn(pg,"DUMP: Spy (filtered)",C.or2,function()
+  dlog("=== FILTERED SPY ===")
+  for _,e in ipairs(spyLog) do if not string.find(e,"CheckCooldown") then dlog(e) end end
   dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,14)
- mBtn(pg,"DUMP Inventory Full",C.or2,function()
-  dlog("=== INV DUMP ===")
-  local inv=gInv();if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
-  for _,i in ipairs(inv:GetChildren()) do
-   dlog(i.ClassName..": "..i.Name.." Locked="..tostring(i:GetAttribute("Locked") or false).." UUID="..tostring(getUUID(i)))
-   local attrs={};pcall(function() for k,v in pairs(i:GetAttributes()) do table.insert(attrs,k.."="..tostring(v)) end end)
-   if #attrs>0 then dlog("  "..table.concat(attrs,", ")) end
-  end
-  dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,15)
- mBtn(pg,"DUMP ALL Remotes",C.or2,function()
-  dlog("=== REMOTES ===")
-  if Rem then for _,r in ipairs(Rem:GetChildren()) do dlog("  "..r.ClassName..": "..r.Name) end end
-  dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
- end,16)
- mBtn(pg,"CLEAR",C.rd,function() DL={};spyLog={};dlog("Cleared");dbgBox.Text="" end,17)
+ end,11)
+ mBtn(pg,"CLEAR",C.rd,function() DL={};spyLog={};dlog("Cleared");dbgBox.Text="" end,12)
 end)
 pcall(function()
  local pg=tP["Config"]
  mSec(pg,"GENERAL",1);mTog(pg,"Anti-AFK","LP_ANTIAFK",C.gn,2)
- mSec(pg,"INFO",4);mLbl(pg,"LP v2.4 DEBUG - LegendaryRvx",5)
- mBtn(pg,"Destroy GUI",C.rd,function() sg:Destroy() end,7)
+ mSec(pg,"INFO",4);mLbl(pg,"LP v2.5 - LegendaryRvx",5)
+ mLbl(pg,"OC=InvokeServer(caseId,1,false,false)",6)
+ mLbl(pg,"Sell=InvokeServer({itemTable,...})",7)
+ mBtn(pg,"Destroy GUI",C.rd,function() sg:Destroy() end,9)
 end)
 swT("Dash")
-log("v2.4 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
-log("Farm case: "..tostring(_G.LP_FARM_CASE))
-log("SPY active: "..tostring(#spyLog>=0))
+log("v2.5 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
+log("Farm: "..tostring(_G.LP_FARM_CASE))
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_FARM then
@@ -566,8 +454,7 @@ coroutine.resume(coroutine.create(function()
     st.sessions=st.sessions+1
     for i=1,5 do
      if not _G.LP_FARM then break end
-     local ok,ret=tryOpenCase(fc)
-     if ok then st.casesOpened=st.casesOpened+1 end
+     if openCase(fc) then st.casesOpened=st.casesOpened+1 end
      wait(0.5)
     end
     log("Farm#"..st.sessions.." c="..st.casesOpened)
@@ -580,19 +467,35 @@ coroutine.resume(coroutine.create(function()
   if _G.LP_SELL then
    pcall(function()
     local inv=gInv();if not inv then return end
-    local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local mx=_G.LP_SELL_MAX or 50;local n=0
+    local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local mx=_G.LP_SELL_MAX or 50
+    local batch={}
     for _,i in ipairs(inv:GetChildren()) do
-     if not _G.LP_SELL or n>=mx then break end
+     if #batch>=mx then break end
      if not i:GetAttribute("Locked") then
       local p=gPrice(i)
-      if p>0 and p<kp then
-       local ok=trySellItem(i)
-       if ok then st.earned=st.earned+p;st.sold=st.sold+1;n=n+1 end
+      if p>0 and p<kp then table.insert(batch,i) end
+     end
+    end
+    if #batch>0 then
+     local entries={}
+     for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
+     local bal1=gBal()
+     local ok=pcall(function() slR:InvokeServer(entries) end)
+     wait(0.5)
+     local bal2=gBal()
+     if bal2>bal1 then
+      local earned=bal2-bal1;st.earned=st.earned+earned;st.sold=st.sold+#batch
+      log("Sold "..#batch.." +$"..math.floor(earned))
+     else
+      for _,item in ipairs(batch) do
+       if not _G.LP_SELL then break end
+       sellOne(item)
        wait(0.3)
+       local bal3=gBal()
+       if bal3>bal1 then st.earned=st.earned+(bal3-bal1);st.sold=st.sold+1;bal1=bal3 end
       end
      end
     end
-    if n>0 then log("Sold "..n) end
    end);wait(4)
   end
  end
@@ -605,7 +508,7 @@ coroutine.resume(coroutine.create(function()
     local cc=nil;local cp=math.huge
     for id,d in pairs(Cases) do if type(d)=="table" and d.Price and type(d.Price)=="number" and d.Price>0 and d.Price<cp then cp=d.Price;cc=id end end
     if cc and gBal()>=cp then
-     local ok=tryOpenCase(cc);if ok then st.casesOpened=st.casesOpened+1;log("Lvl $"..cp) end
+     if openCase(cc) then st.casesOpened=st.casesOpened+1;log("Lvl $"..cp) end
     end
    end);wait(3)
   end
@@ -629,7 +532,7 @@ coroutine.resume(coroutine.create(function()
   if _G.LP_GIFTS then
    pcall(function()
     if urR then pcall(function() urR:InvokeServer() end) end
-    if Rem then for _,rn in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward","PrepareGiftPurchase"}) do local r=Rem:FindFirstChild(rn);if r then pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end) end end end
+    if Rem then for _,rn in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward"}) do local r=Rem:FindFirstChild(rn);if r then pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end) end end end
    end);wait(15)
   end
  end
@@ -652,10 +555,9 @@ coroutine.resume(coroutine.create(function()
      if st.upgSpent+bp>maxM then wait(3);return end
      local m=_G.LP_UPGRADER_MULT or 2;local uuid=getUUID(best);local bal1=gBal()
      st.upgAttempts=st.upgAttempts+1;st.upgSpent=st.upgSpent+bp
+     if uuid then pcall(function() upR:FireServer(uuid,m) end) end
      pcall(function() upR:FireServer(best,m) end)
      pcall(function() upR:FireServer(best.Name,m) end)
-     if uuid then pcall(function() upR:FireServer(uuid,m) end) end
-     pcall(function() upR:FireServer(best.Name,getWear(best),m) end)
      wait(1.5)
      local bal2=gBal();local diff=bal2-bal1
      if diff>0 then st.upgWins=st.upgWins+1;st.upgProfit=st.upgProfit+diff;log("Upg W +$"..math.floor(diff))
@@ -674,7 +576,7 @@ coroutine.resume(coroutine.create(function()
     local cids={};for id in pairs(_G.LP_BATTLE_CASES) do table.insert(cids,tostring(id)) end
     if #cids==0 then
      if Cases then
-      local cn={};for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 then table.insert(cn,{id=id,price=d.Price}) end end
+      local cn={};for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 and d.ForBattles then table.insert(cn,{id=id,price=d.Price}) end end
       table.sort(cn,function(a,b) return a.price<b.price end)
       local lim=math.min(_G.LP_BATTLE_BUDGET or 500,bal-mb)
       for _,c in ipairs(cn) do if c.price<=lim*0.5 then table.insert(cids,tostring(c.id)) end end
@@ -701,4 +603,4 @@ end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
 end))
-log("Ready! Use Debug tab -> SPY first")
+log("Ready!")
