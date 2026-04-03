@@ -19,7 +19,7 @@ pcall(function()
  else dlog("NO Modules") end
 end)
 local Rem=RS:FindFirstChild("Remotes") or RS:WaitForChild("Remotes",5)
-local ocR,slR,exR,cbR,abR,upR,urR
+local ocR,slR,exR,cbR,abR,upR,urR,ccR,clR
 if Rem then
  ocR=Rem:FindFirstChild("OpenCase")
  slR=Rem:FindFirstChild("Sell")
@@ -28,7 +28,9 @@ if Rem then
  abR=Rem:FindFirstChild("AddBot")
  upR=Rem:FindFirstChild("Upgrade")
  urR=Rem:FindFirstChild("UpdateRewards")
- dlog("Remotes OK")
+ ccR=Rem:FindFirstChild("CheckCooldown")
+ clR=Rem:FindFirstChild("ClaimLevelReward") or Rem:FindFirstChild("ClaimReward") or Rem:FindFirstChild("CollectLevelReward")
+ dlog("Remotes OK CC="..(ccR and ccR.ClassName or "X").." CL="..(clR and clR.ClassName or "X"))
 end
 local function gInv()
  local pd=LP:FindFirstChild("PlayerData")
@@ -123,7 +125,7 @@ end
 dlog("GC="..(GC and tostring(GC) or "nil").." Bal="..tostring(gBal()).." Lv="..tostring(gLvl()))
 _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false
 _G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_UPGRADER=false
-_G.LP_ANTIAFK=false;_G.LP_AUTOBATTLE=false
+_G.LP_ANTIAFK=false;_G.LP_AUTOBATTLE=false;_G.LP_LEVELREWARDS=false
 _G.LP_FARM_CASE=GC or "Free"
 _G.LP_SELL_MAX=50;_G.LP_KEEP_ABOVE_PRICE=500
 _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.LP_UPGRADER_MAX_MONEY=5000
@@ -251,9 +253,9 @@ pcall(function()
  mInput(pg,"Keep above $",500,"LP_KEEP_ABOVE_PRICE",12)
  mInput(pg,"Max sell/cy",50,"LP_SELL_MAX",13)
  mSec(pg,"AUTO LEVEL",15);mTog(pg,"Auto Level","LP_LEVEL",C.gn,16)
- mSec(pg,"EXTRAS",20);mTog(pg,"Events","LP_EVENT",C.pu,21);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,22);mTog(pg,"Gifts","LP_GIFTS",C.gn,23)
- mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;log("All ON");swT("Auto") end,28)
- mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;log("All OFF");swT("Auto") end,29)
+ mSec(pg,"EXTRAS",20);mTog(pg,"Level Rewards","LP_LEVELREWARDS",C.bl,21);mTog(pg,"Events","LP_EVENT",C.pu,22);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,23);mTog(pg,"Gifts","LP_GIFTS",C.gn,24)
+ mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;_G.LP_LEVELREWARDS=true;log("All ON");swT("Auto") end,28)
+ mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_LEVELREWARDS=false;log("All OFF");swT("Auto") end,29)
 end)
 pcall(function()
  local pg=tP["Battle"]
@@ -446,19 +448,19 @@ swT("Dash")
 log("v2.5 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
 log("Farm: "..tostring(_G.LP_FARM_CASE))
 coroutine.resume(coroutine.create(function()
- while wait(1) do
+ while wait(0.1) do
   if _G.LP_FARM then
    pcall(function()
     local fc=_G.LP_FARM_CASE
     if not fc or fc=="" then log("Select case!");wait(3);return end
     st.sessions=st.sessions+1
-    for i=1,5 do
+    for i=1,10 do
      if not _G.LP_FARM then break end
      if openCase(fc) then st.casesOpened=st.casesOpened+1 end
-     wait(0.5)
+     wait(0.15)
     end
     log("Farm#"..st.sessions.." c="..st.casesOpened)
-   end);wait(2)
+   end);wait(0.3)
   end
  end
 end))
@@ -599,6 +601,35 @@ coroutine.resume(coroutine.create(function()
 end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end end
+end))
+coroutine.resume(coroutine.create(function()
+ local lvls={"LEVEL10","LEVEL20","LEVEL30","LEVEL40","LEVEL50","LEVEL60","LEVEL70","LEVEL80","LEVEL90","LEVELS100","LEVELS110","LEVELS120"}
+ while wait(1) do
+  if _G.LP_LEVELREWARDS then
+   pcall(function()
+    for _,lv in ipairs(lvls) do
+     if not _G.LP_LEVELREWARDS then break end
+     if ccR then
+      local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
+      if ok and r==true then
+       dlog("LvlRwd "..lv.." ready, claiming...")
+       if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
+       if Rem then
+        for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do
+         local rm=Rem:FindFirstChild(rn)
+         if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end
+        end
+       end
+       local ok2,r2=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+       dlog("  OC("..lv.."): ok="..tostring(ok2).." r="..tostring(r2))
+       wait(0.3)
+      end
+     end
+     wait(0.1)
+    end
+   end);wait(10)
+  end
+ end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
