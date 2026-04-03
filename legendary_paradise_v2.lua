@@ -1,4 +1,4 @@
-print("[LP] * LEGENDARY PARADISE * v2.2 DEBUG loading...")
+print("[LP] v2.3 loading...")
 local Players=game:GetService("Players")
 local RS=game:GetService("ReplicatedStorage")
 local WS=game:GetService("Workspace")
@@ -6,79 +6,49 @@ local LP=Players.LocalPlayer
 local DL={}
 local function dlog(m) local s="["..string.format("%.1f",os.clock()).."] "..tostring(m);table.insert(DL,s);print("[LP] "..tostring(m)) end
 local function dumpObj(obj,depth)
- depth=depth or 0;if depth>3 then return end
- local pf=string.rep("  ",depth)
+ depth=depth or 0;if depth>2 then return end
  for _,c in ipairs(obj:GetChildren()) do
-  local val=""
-  pcall(function() val=" = "..tostring(c.Value) end)
-  dlog(pf..c.ClassName..": "..c.Name..val)
-  if #c:GetChildren()>0 and depth<3 then dumpObj(c,depth+1) end
+  local val="";pcall(function() val=" = "..tostring(c.Value) end)
+  dlog(string.rep("  ",depth)..c.ClassName..": "..c.Name..val)
+  if #c:GetChildren()>0 and depth<2 then dumpObj(c,depth+1) end
  end
 end
-dlog("=== LEGENDARY PARADISE v2.2 DEBUG ===")
-dlog("Player: "..tostring(LP))
-dlog("--- Loading Modules ---")
+dlog("=== LP v2.3 ===")
 local Items,Cases,LevelCalc,Rarities,UpgMod
 pcall(function()
  local M=RS:FindFirstChild("Modules") or RS:WaitForChild("Modules",3)
  if M then
-  dlog("Modules folder: "..M:GetFullName())
-  for _,c in ipairs(M:GetChildren()) do dlog("  Module: "..c.Name.." ("..c.ClassName..")") end
-  local ok1,e1=pcall(function() Items=require(M:WaitForChild("Items",3)) end)
-  dlog("Items: "..(ok1 and "OK" or "FAIL: "..tostring(e1)))
-  if ok1 and Items then local n=0;for _ in pairs(Items) do n=n+1 end;dlog("Items count: "..n) end
-  local ok2,e2=pcall(function() Cases=require(M:WaitForChild("Cases",3)) end)
-  dlog("Cases: "..(ok2 and "OK" or "FAIL: "..tostring(e2)))
-  if ok2 and Cases then local n=0;for _ in pairs(Cases) do n=n+1 end;dlog("Cases count: "..n) end
-  local ok3,e3=pcall(function() LevelCalc=require(M:WaitForChild("LevelCalculator",3)) end)
-  dlog("LevelCalc: "..(ok3 and "OK" or "FAIL: "..tostring(e3)))
-  local ok4,e4=pcall(function() Rarities=require(M:WaitForChild("Rarities",3)) end)
-  dlog("Rarities: "..(ok4 and "OK" or "FAIL: "..tostring(e4)))
-  local ok5,e5=pcall(function() UpgMod=require(M:WaitForChild("Upgrader",3)) end)
-  dlog("Upgrader: "..(ok5 and "OK" or "FAIL: "..tostring(e5)))
- else dlog("ERROR: Modules folder NOT found") end
+  pcall(function() Items=require(M:WaitForChild("Items",3)) end)
+  pcall(function() Cases=require(M:WaitForChild("Cases",3)) end)
+  pcall(function() LevelCalc=require(M:WaitForChild("LevelCalculator",3)) end)
+  pcall(function() Rarities=require(M:WaitForChild("Rarities",3)) end)
+  pcall(function() UpgMod=require(M:WaitForChild("Upgrader",3)) end)
+  dlog("Modules OK")
+ else dlog("NO Modules") end
 end)
-dlog("--- Loading Remotes ---")
 local Rem=RS:FindFirstChild("Remotes") or RS:WaitForChild("Remotes",5)
 local ocR,slR,exR,cbR,abR,upR,urR
 if Rem then
- dlog("Remotes folder: "..Rem:GetFullName())
- dlog("All remotes:")
- for _,r in ipairs(Rem:GetChildren()) do dlog("  "..r.ClassName..": "..r.Name) end
- ocR=Rem:FindFirstChild("OpenCase");dlog("OpenCase: "..(ocR and ocR.ClassName or "NOT FOUND"))
- slR=Rem:FindFirstChild("Sell") or Rem:FindFirstChild("SellItem") or Rem:FindFirstChild("SellSkin")
- if not slR then pcall(function() slR=Rem:WaitForChild("Sell",3) end) end
- dlog("Sell: "..(slR and (slR.Name.." "..slR.ClassName) or "NOT FOUND"))
- exR=Rem:FindFirstChild("ExchangeEvent") or Rem:FindFirstChild("Exchange")
- dlog("Exchange: "..(exR and (exR.Name.." "..exR.ClassName) or "NOT FOUND"))
- cbR=Rem:FindFirstChild("CreateBattle");dlog("CreateBattle: "..(cbR and cbR.ClassName or "NOT FOUND"))
- abR=Rem:FindFirstChild("AddBot");dlog("AddBot: "..(abR and abR.ClassName or "NOT FOUND"))
- upR=Rem:FindFirstChild("Upgrade") or Rem:FindFirstChild("UpgradeItem")
- dlog("Upgrade: "..(upR and (upR.Name.." "..upR.ClassName) or "NOT FOUND"))
- urR=Rem:FindFirstChild("UpdateRewards");dlog("UpdateRewards: "..(urR and urR.ClassName or "NOT FOUND"))
-else dlog("ERROR: Remotes folder NOT found") end
-dlog("--- PlayerData ---")
-pcall(function()
- local pd=LP:FindFirstChild("PlayerData")
- if pd then dlog("PlayerData found");dumpObj(pd,1)
- else
-  dlog("PlayerData NOT found")
-  local ls=LP:FindFirstChild("leaderstats")
-  if ls then dlog("leaderstats found");dumpObj(ls,1)
-  else dlog("LP children:");for _,c in ipairs(LP:GetChildren()) do dlog("  "..c.ClassName..": "..c.Name) end end
- end
-end)
+ ocR=Rem:FindFirstChild("OpenCase")
+ slR=Rem:FindFirstChild("Sell")
+ exR=Rem:FindFirstChild("ExchangeEvent")
+ cbR=Rem:FindFirstChild("CreateBattle")
+ abR=Rem:FindFirstChild("AddBot")
+ upR=Rem:FindFirstChild("Upgrade")
+ urR=Rem:FindFirstChild("UpdateRewards")
+ dlog("Remotes: OC="..(ocR and "RF" or "X").." Sell="..(slR and "RF" or "X").." Up="..(upR and upR.ClassName or "X"))
+end
 local function gInv()
  local pd=LP:FindFirstChild("PlayerData")
  if not pd then return nil end
- return pd:FindFirstChild("Inventory") or pd:FindFirstChild("Skins") or pd:FindFirstChild("Items")
+ return pd:FindFirstChild("Inventory")
 end
 local function gBal()
  local pd=LP:FindFirstChild("PlayerData")
  if not pd then return 0 end
  local c=pd:FindFirstChild("Currencies")
  if not c then return 0 end
- local b=c:FindFirstChild("Balance") or c:FindFirstChild("Money") or c:FindFirstChild("Cash")
+ local b=c:FindFirstChild("Balance")
  return b and b.Value or 0
 end
 local function gLvl()
@@ -87,7 +57,7 @@ local function gLvl()
  if not pd then return 0 end
  local c=pd:FindFirstChild("Currencies")
  if not c then return 0 end
- local e=c:FindFirstChild("Experience") or c:FindFirstChild("XP")
+ local e=c:FindFirstChild("Experience")
  if not e then return 0 end
  local ok,d=pcall(function() return LevelCalc.CalculateLevel(e.Value) end)
  if ok and d then return d.Level or 0 end
@@ -97,114 +67,112 @@ local function gPrice(item)
  if not Items then return 0 end
  local ok,d=pcall(function() return Items[item.Name] end)
  if not ok or not d or not d.Wears then return 0 end
- local w=nil
- pcall(function() w=item:GetAttribute("Wear") end)
- local stt=false
- pcall(function() stt=item:GetAttribute("Stattrak")==true end)
+ local w=nil;pcall(function() w=item:GetAttribute("Wear") end)
+ local stt=false;pcall(function() stt=item:GetAttribute("Stattrak")==true end)
  if not w or not d.Wears[w] then for wn in pairs(d.Wears) do w=wn;break end end
  if not w or not d.Wears[w] then return 0 end
  local wd=d.Wears[w]
  if stt then return wd.StatTrak or wd.Normal or 0 else return wd.Normal or wd.StatTrak or 0 end
 end
+local function getWear(item)
+ local w=nil;pcall(function() w=item:GetAttribute("Wear") end)
+ if w then return w end
+ if Items then
+  local ok,d=pcall(function() return Items[item.Name] end)
+  if ok and d and d.Wears then for wn in pairs(d.Wears) do return wn end end
+ end
+ return nil
+end
+local function getST(item)
+ local s=false;pcall(function() s=item:GetAttribute("Stattrak")==true end);return s
+end
 local function tryOpenCase(cid)
- if not ocR then dlog("FARM ERR: ocR is nil");return false,"no remote" end
- dlog("tryOpen cid="..tostring(cid).." type="..type(cid).." remote="..ocR.ClassName)
+ if not ocR then dlog("OC: nil");return false,"no remote" end
+ dlog("OC: cid="..tostring(cid))
  local bal1=gBal()
- if ocR:IsA("RemoteFunction") then
-  local ok1,r1=pcall(function() return ocR:InvokeServer(cid) end)
-  dlog("  InvokeServer(cid): ok="..tostring(ok1).." ret="..tostring(r1))
-  if ok1 and r1~=nil and r1~=false then return true,r1 end
-  local ok2,r2=pcall(function() return ocR:InvokeServer(tostring(cid)) end)
-  dlog("  InvokeServer(str): ok="..tostring(ok2).." ret="..tostring(r2))
-  if ok2 and r2~=nil and r2~=false then return true,r2 end
-  local ok3,r3=pcall(function() return ocR:InvokeServer({Case=cid}) end)
-  dlog("  InvokeServer({Case=}): ok="..tostring(ok3).." ret="..tostring(r3))
-  if ok3 and r3~=nil and r3~=false then return true,r3 end
-  local ok4,r4=pcall(function() return ocR:InvokeServer({cid}) end)
-  dlog("  InvokeServer({cid}): ok="..tostring(ok4).." ret="..tostring(r4))
-  if ok4 and r4~=nil and r4~=false then return true,r4 end
- elseif ocR:IsA("RemoteEvent") then
-  local ok1,e1=pcall(function() ocR:FireServer(cid) end)
-  dlog("  FireServer(cid): ok="..tostring(ok1).." err="..tostring(e1))
-  wait(0.5)
-  local ok2,e2=pcall(function() ocR:FireServer(tostring(cid)) end)
-  dlog("  FireServer(str): ok="..tostring(ok2).." err="..tostring(e2))
-  wait(0.5)
-  local ok3,e3=pcall(function() ocR:FireServer({Case=cid}) end)
-  dlog("  FireServer({Case=}): ok="..tostring(ok3).." err="..tostring(e3))
- end
+ local ok1,r1=pcall(function() return ocR:InvokeServer(cid) end)
+ dlog("  OC(cid): ok="..tostring(ok1).." r="..tostring(r1))
+ wait(0.3)
  local bal2=gBal()
- dlog("  Balance: "..tostring(bal1).." -> "..tostring(bal2))
- return bal2~=bal1,"bal:"..tostring(bal1).."->"..tostring(bal2)
+ if bal2~=bal1 then dlog("  OC OK bal "..tostring(bal1).."->"..tostring(bal2));return true,"ok" end
+ local ok2,r2=pcall(function() return ocR:InvokeServer(tostring(cid)) end)
+ dlog("  OC(str): ok="..tostring(ok2).." r="..tostring(r2))
+ wait(0.3)
+ local bal3=gBal()
+ if bal3~=bal2 then dlog("  OC str OK");return true,"ok-str" end
+ local ok3,r3=pcall(function() return ocR:InvokeServer({Case=cid}) end)
+ dlog("  OC({Case=}): ok="..tostring(ok3).." r="..tostring(r3))
+ wait(0.3)
+ local bal4=gBal()
+ if bal4~=bal3 then return true,"ok-tbl" end
+ return false,"no change"
 end
-local function trySell(item)
- if not slR then dlog("SELL ERR: slR is nil");return false end
- local iname="?"
- pcall(function() iname=item.Name end)
- dlog("trySell item="..iname.." remote="..slR.Name.." "..slR.ClassName)
+local function trySellItem(item)
+ if not slR then dlog("Sell: nil");return false end
+ local n=item.Name
+ local w=getWear(item)
+ local st2=getST(item)
+ dlog("Sell: "..n.." w="..(w or "nil").." st="..tostring(st2))
  local bal1=gBal()
- if slR:IsA("RemoteFunction") then
-  local ok1,r1=pcall(function() return slR:InvokeServer(item) end)
-  dlog("  Sell Invoke(item): ok="..tostring(ok1).." ret="..tostring(r1))
-  if ok1 and r1~=nil and r1~=false then return true end
-  local ok2,r2=pcall(function() return slR:InvokeServer(item.Name) end)
-  dlog("  Sell Invoke(name): ok="..tostring(ok2).." ret="..tostring(r2))
-  if ok2 and r2~=nil and r2~=false then return true end
-  local ok3,r3=pcall(function() return slR:InvokeServer({item}) end)
-  dlog("  Sell Invoke({item}): ok="..tostring(ok3).." ret="..tostring(r3))
-  if ok3 and r3~=nil and r3~=false then return true end
- elseif slR:IsA("RemoteEvent") then
-  local ok1,e1=pcall(function() slR:FireServer(item) end)
-  dlog("  Sell Fire(item): ok="..tostring(ok1).." err="..tostring(e1))
-  wait(0.3)
-  local ok2,e2=pcall(function() slR:FireServer(item.Name) end)
-  dlog("  Sell Fire(name): ok="..tostring(ok2).." err="..tostring(e2))
- end
- local bal2=gBal()
- dlog("  Sell bal: "..tostring(bal1).." -> "..tostring(bal2))
- return bal2>bal1
+ local ok1,r1=pcall(function() return slR:InvokeServer(n) end)
+ dlog("  S(name): ok="..tostring(ok1).." r="..tostring(r1))
+ wait(0.3);local bal2=gBal()
+ if bal2>bal1 then dlog("  S name OK +"..tostring(bal2-bal1));return true end
+ local ok2,r2=pcall(function() return slR:InvokeServer(n,w) end)
+ dlog("  S(name,w): ok="..tostring(ok2).." r="..tostring(r2))
+ wait(0.3);local bal3=gBal()
+ if bal3>bal2 then dlog("  S name,w OK");return true end
+ local ok3,r3=pcall(function() return slR:InvokeServer(n,w,st2) end)
+ dlog("  S(n,w,st): ok="..tostring(ok3).." r="..tostring(r3))
+ wait(0.3);local bal4=gBal()
+ if bal4>bal3 then dlog("  S n,w,st OK");return true end
+ local ok4,r4=pcall(function() return slR:InvokeServer({Name=n,Wear=w,Stattrak=st2}) end)
+ dlog("  S(tbl): ok="..tostring(ok4).." r="..tostring(r4))
+ wait(0.3);local bal5=gBal()
+ if bal5>bal4 then dlog("  S tbl OK");return true end
+ local ok5,r5=pcall(function() return slR:InvokeServer(item) end)
+ dlog("  S(inst): ok="..tostring(ok5).." r="..tostring(r5))
+ wait(0.3);local bal6=gBal()
+ if bal6>bal5 then dlog("  S inst OK");return true end
+ local ok6,r6=pcall(function() return slR:InvokeServer({n}) end)
+ dlog("  S({n}): ok="..tostring(ok6).." r="..tostring(r6))
+ wait(0.3);local bal7=gBal()
+ if bal7>bal6 then dlog("  S {n} OK");return true end
+ local ok7,r7=pcall(function() return slR:InvokeServer(n,w,st2,item:GetAttribute("TimeObtained") or 0) end)
+ dlog("  S(n,w,st,t): ok="..tostring(ok7).." r="..tostring(r7))
+ wait(0.3);local bal8=gBal()
+ if bal8>bal7 then dlog("  S full OK");return true end
+ dlog("  Sell FAILED all patterns")
+ return false
 end
-dlog("--- Inventory ---")
+dlog("--- Inv ---")
 pcall(function()
  local inv=gInv()
  if inv then
-  dlog("Inventory: "..inv.Name.." ("..#inv:GetChildren().." items)")
-  local sample=inv:GetChildren()
-  for i=1,math.min(5,#sample) do
-   local it=sample[i];local p=gPrice(it)
-   local attrs=""
-   pcall(function() local w=it:GetAttribute("Wear");if w then attrs=attrs.." W="..tostring(w) end end)
-   pcall(function() local s=it:GetAttribute("Stattrak");if s then attrs=attrs.." ST" end end)
-   dlog("  ["..i.."] "..it.Name.." $"..p..attrs)
+  local ch=inv:GetChildren();dlog("Inv: "..#ch.." items")
+  for i=1,math.min(5,#ch) do
+   local it=ch[i];local w=getWear(it);local st2=getST(it)
+   dlog("  "..it.Name.." $"..gPrice(it).." W="..(w or "?").." ST="..tostring(st2))
+   local attrs={};pcall(function() for k,v in pairs(it:GetAttributes()) do table.insert(attrs,k.."="..tostring(v)) end end)
+   if #attrs>0 then dlog("    attrs: "..table.concat(attrs,", ")) end
   end
- else dlog("Inventory NOT found") end
+ else dlog("No inv") end
 end)
-dlog("--- Cases ---")
 local GC=nil
 if Cases then
- local cn=0
  for id,d in pairs(Cases) do
-  cn=cn+1
-  if cn<=10 then
-   local info="id="..tostring(id)
-   if type(d)=="table" then
-    info=info.." name="..(d.Name or "?").." price="..(d.Price and tostring(d.Price) or "?")
-    if d.GroupOnly then info=info.." GROUP";GC=id end
-    if not GC and d.Name and string.lower(tostring(d.Name)):find("group") then GC=id;info=info.." (group)" end
-   end
-   dlog("  "..info)
+  if type(d)=="table" then
+   if d.GroupOnly==true then GC=id;break end
+   if d.Name and string.lower(tostring(d.Name)):find("group") then GC=id;break end
   end
  end
- dlog("Total cases: "..cn)
-else dlog("Cases module nil") end
-dlog("GroupCase: "..tostring(GC))
-dlog("Balance: "..tostring(gBal()))
-dlog("Level: "..tostring(gLvl()))
-dlog("=== END STARTUP ===")
+end
+dlog("GC="..(GC or "nil").." Bal="..tostring(gBal()).." Lv="..tostring(gLvl()))
 _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false
 _G.LP_QUESTS=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_UPGRADER=false
 _G.LP_ANTIAFK=false;_G.LP_AUTOBATTLE=false
-_G.LP_FARM_CASE=GC or "";_G.LP_SELL_MAX=50;_G.LP_KEEP_ABOVE_PRICE=900
+_G.LP_FARM_CASE=GC or "Free"
+_G.LP_SELL_MAX=50;_G.LP_KEEP_ABOVE_PRICE=500
 _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.LP_UPGRADER_MAX_MONEY=5000
 _G.LP_BATTLE_BUDGET=500;_G.LP_BATTLE_MIN_BAL=100;_G.LP_BATTLE_RISK="Medium"
 _G.LP_BATTLE_MODE="CRAZY TERMINAL";_G.LP_BATTLE_CASES={}
@@ -223,8 +191,8 @@ pcall(function() mn.Active=true end);pcall(function() mn.Draggable=true end)
 mn.Parent=sg;pcall(function() Instance.new("UICorner",mn).CornerRadius=UDim.new(0,10) end)
 local topb=Instance.new("Frame");topb.Size=UDim2.new(1,0,0,30);topb.BackgroundColor3=C.tb;topb.BorderSizePixel=0;topb.Parent=mn
 pcall(function() Instance.new("UICorner",topb).CornerRadius=UDim.new(0,10) end)
-local tf=Instance.new("Frame");tf.Size=UDim2.new(1,0,0,10);tf.Position=UDim2.new(0,0,1,-10);tf.BackgroundColor3=C.tb;tf.BorderSizePixel=0;tf.Parent=topb
-local tl=Instance.new("TextLabel");tl.Size=UDim2.new(1,-70,1,0);tl.Position=UDim2.new(0,10,0,0);tl.BackgroundTransparency=1;tl.Text="* LEGENDARY PARADISE * v2.2";tl.TextColor3=C.ac;tl.TextSize=12;tl.Font=Enum.Font.GothamBold;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Parent=topb
+Instance.new("Frame",topb).Size=UDim2.new(1,0,0,10);topb:FindFirstChildOfClass("Frame").Position=UDim2.new(0,0,1,-10);topb:FindFirstChildOfClass("Frame").BackgroundColor3=C.tb;topb:FindFirstChildOfClass("Frame").BorderSizePixel=0
+local tl=Instance.new("TextLabel");tl.Size=UDim2.new(1,-70,1,0);tl.Position=UDim2.new(0,10,0,0);tl.BackgroundTransparency=1;tl.Text="LP v2.3 DEBUG";tl.TextColor3=C.ac;tl.TextSize=12;tl.Font=Enum.Font.GothamBold;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Parent=topb
 local xb=Instance.new("TextButton");xb.Size=UDim2.new(0,24,0,20);xb.Position=UDim2.new(1,-30,0,5);xb.BackgroundColor3=C.rd;xb.Text="X";xb.TextColor3=C.tw;xb.TextSize=11;xb.Font=Enum.Font.GothamBold;xb.BorderSizePixel=0;xb.Parent=topb
 pcall(function() Instance.new("UICorner",xb).CornerRadius=UDim.new(0,5) end)
 xb.MouseButton1Click:Connect(function() sg:Destroy() end)
@@ -237,13 +205,7 @@ pcall(function() Instance.new("UICorner",sbar).CornerRadius=UDim.new(0,8) end)
 local ca=Instance.new("Frame");ca.Size=UDim2.new(1,-90,1,-4);ca.Position=UDim2.new(0,88,0,2);ca.BackgroundTransparency=1;ca.Parent=bf
 local tP,tB,aT={},{},nil
 local tD={{"Dash"},{"Auto"},{"Battle"},{"Upgr"},{"Exploit"},{"Debug"},{"Config"}}
-local function swT(n)
- aT=n
- for k,p in pairs(tP) do p.Visible=(k==n) end
- for k,b in pairs(tB) do
-  if k==n then b.BackgroundColor3=C.ac;b.TextColor3=Color3.fromRGB(0,0,0) else b.BackgroundColor3=Color3.fromRGB(30,30,36);b.TextColor3=C.tx end
- end
-end
+local function swT(n) aT=n;for k,p in pairs(tP) do p.Visible=(k==n) end;for k,b in pairs(tB) do if k==n then b.BackgroundColor3=C.ac;b.TextColor3=Color3.fromRGB(0,0,0) else b.BackgroundColor3=Color3.fromRGB(30,30,36);b.TextColor3=C.tx end end end
 for i,d in ipairs(tD) do
  local b=Instance.new("TextButton");b.Size=UDim2.new(1,-8,0,22);b.Position=UDim2.new(0,4,0,3+(i-1)*26);b.BackgroundColor3=Color3.fromRGB(30,30,36);b.Text=d[1];b.TextColor3=C.tx;b.TextSize=9;b.Font=Enum.Font.GothamBold;b.BorderSizePixel=0;b.Parent=sbar
  pcall(function() Instance.new("UICorner",b).CornerRadius=UDim.new(0,6) end)
@@ -256,12 +218,12 @@ for _,d in ipairs(tD) do
  local p=Instance.new("UIPadding");p.PaddingLeft=UDim.new(0,3);p.PaddingRight=UDim.new(0,3);p.PaddingTop=UDim.new(0,3);p.Parent=s
  tP[d[1]]=s
 end
-local function mSec(p,t,o) local l=Instance.new("TextLabel");l.Size=UDim2.new(1,0,0,16);l.BackgroundTransparency=1;l.Text="-- "..t.." --";l.TextColor3=C.ac;l.TextSize=9;l.Font=Enum.Font.GothamBold;l.LayoutOrder=o or 0;l.Parent=p;return l end
+local function mSec(p,t,o) local l=Instance.new("TextLabel");l.Size=UDim2.new(1,0,0,16);l.BackgroundTransparency=1;l.Text="-- "..t.." --";l.TextColor3=C.ac;l.TextSize=9;l.Font=Enum.Font.GothamBold;l.LayoutOrder=o or 0;l.Parent=p end
 local function mLbl(p,t,o) local l=Instance.new("TextLabel");l.Size=UDim2.new(1,0,0,14);l.BackgroundTransparency=1;l.Text=t;l.TextColor3=C.tx;l.TextSize=9;l.Font=Enum.Font.Gotham;l.TextXAlignment=Enum.TextXAlignment.Left;l.TextWrapped=true;l.LayoutOrder=o or 0;l.Parent=p;return l end
 local function mTog(p,lt,fl,co,o)
  local r=Instance.new("Frame");r.Size=UDim2.new(1,0,0,24);r.BackgroundColor3=C.cd;r.BorderSizePixel=0;r.LayoutOrder=o or 0;r.Parent=p
  pcall(function() Instance.new("UICorner",r).CornerRadius=UDim.new(0,6) end)
- local l=Instance.new("TextLabel");l.Size=UDim2.new(1,-50,1,0);l.Position=UDim2.new(0,6,0,0);l.BackgroundTransparency=1;l.Text=lt;l.TextColor3=C.tx;l.TextSize=9;l.Font=Enum.Font.Gotham;l.TextXAlignment=Enum.TextXAlignment.Left;l.TextWrapped=true;l.Parent=r
+ local l=Instance.new("TextLabel");l.Size=UDim2.new(1,-50,1,0);l.Position=UDim2.new(0,6,0,0);l.BackgroundTransparency=1;l.Text=lt;l.TextColor3=C.tx;l.TextSize=9;l.Font=Enum.Font.Gotham;l.TextXAlignment=Enum.TextXAlignment.Left;l.Parent=r
  local b=Instance.new("TextButton");b.Size=UDim2.new(0,38,0,16);b.Position=UDim2.new(1,-42,0.5,-8);b.BorderSizePixel=0;b.TextSize=9;b.Font=Enum.Font.GothamBold;b.Parent=r
  pcall(function() Instance.new("UICorner",b).CornerRadius=UDim.new(0,5) end)
  local function rf() if _G[fl] then b.BackgroundColor3=co or C.ton;b.Text="ON";b.TextColor3=C.tw else b.BackgroundColor3=C.tof;b.Text="OFF";b.TextColor3=C.td end end
@@ -278,50 +240,46 @@ local function mInput(p,lbl,def,gkey,o)
  return tb2
 end
 local logQ,logLbl={},nil
-local function log(m)
- dlog(m)
- table.insert(logQ,tostring(m))
- if #logQ>10 then table.remove(logQ,1) end
- if logLbl then logLbl.Text=table.concat(logQ,"\n") end
-end
+local function log(m) dlog(m);table.insert(logQ,tostring(m));if #logQ>10 then table.remove(logQ,1) end;if logLbl then logLbl.Text=table.concat(logQ,"\n") end end
 pcall(function()
  local pg=tP["Dash"]
- mSec(pg,"LEGENDARY PARADISE",1);mLbl(pg,"Case Paradise v2.2 DEBUG",2)
- mSec(pg,"PLAYER",3);local il=mLbl(pg,"Loading...",4)
- mSec(pg,"GROUP CASE",5);mLbl(pg,GC and("Found: "..tostring(GC)) or "Not found!",6)
- mSec(pg,"STATS",7);local sl=mLbl(pg,"S:0 C:0 Sold:0 $0",8)
+ mSec(pg,"LEGENDARY PARADISE",1)
+ mSec(pg,"PLAYER",3);local il=mLbl(pg,"...",4)
+ mSec(pg,"STATS",7);local sl=mLbl(pg,"...",8)
  mSec(pg,"LIVE LOG",9)
- local lb=Instance.new("Frame");lb.Size=UDim2.new(1,0,0,110);lb.BackgroundColor3=C.lb;lb.BorderSizePixel=0;lb.LayoutOrder=10;lb.Parent=pg
+ local lb=Instance.new("Frame");lb.Size=UDim2.new(1,0,0,120);lb.BackgroundColor3=C.lb;lb.BorderSizePixel=0;lb.LayoutOrder=10;lb.Parent=pg
  pcall(function() Instance.new("UICorner",lb).CornerRadius=UDim.new(0,6) end)
- logLbl=Instance.new("TextLabel");logLbl.Size=UDim2.new(1,-6,1,-4);logLbl.Position=UDim2.new(0,3,0,2);logLbl.BackgroundTransparency=1;logLbl.Text="Starting...";logLbl.TextColor3=Color3.fromRGB(160,220,160);logLbl.TextSize=8;logLbl.Font=Enum.Font.Code;logLbl.TextXAlignment=Enum.TextXAlignment.Left;logLbl.TextYAlignment=Enum.TextYAlignment.Top;logLbl.TextWrapped=true;logLbl.Parent=lb
- coroutine.resume(coroutine.create(function() while wait(2) do pcall(function() il.Text="Lv:"..tostring(gLvl()).." | $"..tostring(math.floor(gBal()));sl.Text="S:"..st.sessions.." C:"..st.casesOpened.." Sold:"..st.sold.." $"..math.floor(st.earned) end) end end))
+ logLbl=Instance.new("TextLabel");logLbl.Size=UDim2.new(1,-6,1,-4);logLbl.Position=UDim2.new(0,3,0,2);logLbl.BackgroundTransparency=1;logLbl.Text="...";logLbl.TextColor3=Color3.fromRGB(160,220,160);logLbl.TextSize=8;logLbl.Font=Enum.Font.Code;logLbl.TextXAlignment=Enum.TextXAlignment.Left;logLbl.TextYAlignment=Enum.TextYAlignment.Top;logLbl.TextWrapped=true;logLbl.Parent=lb
+ coroutine.resume(coroutine.create(function() while wait(2) do pcall(function()
+  il.Text="Lv:"..tostring(gLvl()).." $"..tostring(math.floor(gBal()))
+  sl.Text="S:"..st.sessions.." C:"..st.casesOpened.." Sold:"..st.sold.." $"..math.floor(st.earned)
+ end) end end))
 end)
 pcall(function()
  local pg=tP["Auto"]
  mSec(pg,"AUTO FARM",1);mTog(pg,"Auto Farm","LP_FARM",C.bl,2)
- mLbl(pg,"Select farm case:",3)
- local fcl=mLbl(pg,"Case: "..(GC and tostring(GC) or "none"),4);fcl.TextColor3=C.ac
+ local fcl=mLbl(pg,"Case: ".._G.LP_FARM_CASE,3);fcl.TextColor3=C.ac
  local acn={}
  if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Name then table.insert(acn,{id=id,name=d.Name,price=d.Price or 0}) end end;table.sort(acn,function(a,b) return a.price<b.price end) end
- local fcf=Instance.new("Frame");fcf.Size=UDim2.new(1,0,0,65);fcf.BackgroundColor3=Color3.fromRGB(15,15,19);fcf.BorderSizePixel=0;fcf.LayoutOrder=5;fcf.Parent=pg
+ local fcf=Instance.new("Frame");fcf.Size=UDim2.new(1,0,0,65);fcf.BackgroundColor3=Color3.fromRGB(15,15,19);fcf.BorderSizePixel=0;fcf.LayoutOrder=4;fcf.Parent=pg
  pcall(function() Instance.new("UICorner",fcf).CornerRadius=UDim.new(0,6) end)
  local fcs=Instance.new("ScrollingFrame");fcs.Size=UDim2.new(1,-4,1,-4);fcs.Position=UDim2.new(0,2,0,2);fcs.BackgroundTransparency=1;fcs.BorderSizePixel=0;fcs.ScrollBarThickness=3;fcs.CanvasSize=UDim2.new(0,0,0,#acn*18+8);fcs.Parent=fcf
  local fcL=Instance.new("UIListLayout");fcL.SortOrder=Enum.SortOrder.LayoutOrder;fcL.Padding=UDim.new(0,1);fcL.Parent=fcs
  local fcBs={}
  for idx,e in ipairs(acn) do
-  local fb=Instance.new("TextButton");fb.Size=UDim2.new(1,-4,0,16);fb.BackgroundColor3=(e.id==GC) and C.ac or C.cd;fb.Text=e.name..(e.price>0 and(" $"..e.price) or " FREE");fb.TextColor3=(e.id==GC) and Color3.fromRGB(0,0,0) or C.tx;fb.TextSize=8;fb.Font=Enum.Font.Gotham;fb.TextXAlignment=Enum.TextXAlignment.Left;fb.BorderSizePixel=0;fb.LayoutOrder=idx;fb.Parent=fcs
+  local sel=(e.id==_G.LP_FARM_CASE)
+  local fb=Instance.new("TextButton");fb.Size=UDim2.new(1,-4,0,16);fb.BackgroundColor3=sel and C.ac or C.cd;fb.Text=e.name..(e.price>0 and(" $"..e.price) or " FREE");fb.TextColor3=sel and Color3.fromRGB(0,0,0) or C.tx;fb.TextSize=8;fb.Font=Enum.Font.Gotham;fb.TextXAlignment=Enum.TextXAlignment.Left;fb.BorderSizePixel=0;fb.LayoutOrder=idx;fb.Parent=fcs
   pcall(function() Instance.new("UICorner",fb).CornerRadius=UDim.new(0,4) end)
   fcBs[e.id]=fb
-  fb.MouseButton1Click:Connect(function() _G.LP_FARM_CASE=e.id;fcl.Text="Case: "..e.name;dlog("FarmCase="..tostring(e.id));for k,v in pairs(fcBs) do if k==e.id then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
+  fb.MouseButton1Click:Connect(function() _G.LP_FARM_CASE=e.id;fcl.Text="Case: "..e.name;for k,v in pairs(fcBs) do if k==e.id then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
  end
  mSec(pg,"AUTO SELL",10);mTog(pg,"Auto Sell","LP_SELL",C.or2,11)
- mInput(pg,"Keep above $",900,"LP_KEEP_ABOVE_PRICE",12)
+ mInput(pg,"Keep above $",500,"LP_KEEP_ABOVE_PRICE",12)
  mInput(pg,"Max sell/cy",50,"LP_SELL_MAX",13)
  mSec(pg,"AUTO LEVEL",15);mTog(pg,"Auto Level","LP_LEVEL",C.gn,16)
- mSec(pg,"AUTO QUESTS",18);mTog(pg,"Auto Quests","LP_QUESTS",C.pu,19)
- mSec(pg,"EXTRAS",22);mTog(pg,"Events","LP_EVENT",C.pu,23);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,24);mTog(pg,"Gifts","LP_GIFTS",C.gn,25)
- mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_QUESTS=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;log("All ON");swT("Auto") end,28)
- mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_QUESTS=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;log("All OFF");swT("Auto") end,29)
+ mSec(pg,"EXTRAS",20);mTog(pg,"Events","LP_EVENT",C.pu,21);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,22);mTog(pg,"Gifts","LP_GIFTS",C.gn,23)
+ mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;log("All ON");swT("Auto") end,28)
+ mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;log("All OFF");swT("Auto") end,29)
 end)
 pcall(function()
  local pg=tP["Battle"]
@@ -339,7 +297,7 @@ pcall(function()
  for idx,e in ipairs(acn2) do
   local cb=Instance.new("TextButton");cb.Size=UDim2.new(1,-4,0,18);cb.BackgroundColor3=C.cd;cb.Text=e.name..(e.price>0 and(" $"..e.price) or " FREE");cb.TextColor3=C.tx;cb.TextSize=8;cb.Font=Enum.Font.Gotham;cb.TextXAlignment=Enum.TextXAlignment.Left;cb.BorderSizePixel=0;cb.LayoutOrder=idx;cb.Parent=csc
   pcall(function() Instance.new("UICorner",cb).CornerRadius=UDim.new(0,4) end)
-  table.insert(cBs,{btn=cb,name=e.name,id=e.id,price=e.price})
+  table.insert(cBs,{btn=cb,name=e.name,id=e.id})
   cb.MouseButton1Click:Connect(function()
    if _G.LP_BATTLE_CASES[e.id] then _G.LP_BATTLE_CASES[e.id]=nil;cb.BackgroundColor3=C.cd;cb.TextColor3=C.tx
    else _G.LP_BATTLE_CASES[e.id]=e.name;cb.BackgroundColor3=C.ac;cb.TextColor3=Color3.fromRGB(0,0,0) end
@@ -361,23 +319,21 @@ pcall(function()
  mBtn(pg,"CREATE BATTLE",C.bl,function()
   local cids={};for id in pairs(_G.LP_BATTLE_CASES) do table.insert(cids,tostring(id)) end
   if #cids==0 then log("Select cases!");return end
-  if not cbR then log("CreateBattle nil!");return end
+  if not cbR then log("No cbR!");return end
   local bal1=gBal()
-  dlog("Battle: "..#cids.." cases mode=".._G.LP_BATTLE_MODE.." cids="..table.concat(cids,","))
+  dlog("Battle: "..#cids.." cases "..table.concat(cids,",").." mode=".._G.LP_BATTLE_MODE)
   local ok,bid=pcall(function() return cbR:InvokeServer(cids,2,_G.LP_BATTLE_MODE,false) end)
-  dlog("CreateBattle: ok="..tostring(ok).." bid="..tostring(bid))
+  dlog("CB: ok="..tostring(ok).." bid="..tostring(bid))
   if ok and bid and abR then
-   wait(0.6)
-   local ok2,e2=pcall(function() abR:FireServer(tonumber(bid),LP) end)
-   dlog("AddBot: ok="..tostring(ok2).." err="..tostring(e2))
+   wait(0.6);pcall(function() abR:FireServer(tonumber(bid),LP) end)
    st.battlesPlayed=st.battlesPlayed+1
-   log("Battle #"..st.battlesPlayed.." created, waiting result...")
-   wait(10)
+   log("Battle #"..st.battlesPlayed.." waiting...")
+   wait(12)
    local bal2=gBal();local diff=bal2-bal1
-   dlog("Battle result: "..tostring(bal1).." -> "..tostring(bal2).." diff="..diff)
+   dlog("Battle: "..tostring(bal1).."->"..tostring(bal2).." d="..diff)
    if diff>0 then st.battlesWon=st.battlesWon+1;st.battleProfit=st.battleProfit+diff;log("WIN +$"..math.floor(diff))
    else st.battlesLost=st.battlesLost+1;st.battleProfit=st.battleProfit+diff;log("LOSS $"..math.floor(diff)) end
-  else log("Fail ok="..tostring(ok).." bid="..tostring(bid)) end
+  else log("Fail") end
  end,8)
  mSec(pg,"AUTO BATTLE",10);mTog(pg,"Auto Battle","LP_AUTOBATTLE",C.pu,11)
  mInput(pg,"Budget $",500,"LP_BATTLE_BUDGET",12)
@@ -389,25 +345,26 @@ end)
 pcall(function()
  local pg=tP["Upgr"]
  mSec(pg,"UPGRADER",1);mTog(pg,"Auto Upgrader","LP_UPGRADER",C.or2,2)
- mSec(pg,"MULT",3)
- local mBs2={};local mr2=Instance.new("Frame");mr2.Size=UDim2.new(1,0,0,22);mr2.BackgroundTransparency=1;mr2.LayoutOrder=4;mr2.Parent=pg
+ mLbl(pg,"Upgrade remote = RemoteEvent (FireServer)",3)
+ mSec(pg,"MULT",4)
+ local mBs2={};local mr2=Instance.new("Frame");mr2.Size=UDim2.new(1,0,0,22);mr2.BackgroundTransparency=1;mr2.LayoutOrder=5;mr2.Parent=pg
  for i,m in ipairs({2,3,5,10}) do
   local b=Instance.new("TextButton");b.Size=UDim2.new(0.24,-3,1,0);b.Position=UDim2.new((i-1)*0.25,2,0,0);b.BackgroundColor3=m==2 and C.ac or C.cd;b.Text=m.."x";b.TextColor3=m==2 and Color3.fromRGB(0,0,0) or C.tx;b.TextSize=9;b.Font=Enum.Font.GothamBold;b.BorderSizePixel=0;b.Parent=mr2
   pcall(function() Instance.new("UICorner",b).CornerRadius=UDim.new(0,5) end);mBs2[m]=b
   b.MouseButton1Click:Connect(function() _G.LP_UPGRADER_MULT=m;for k,v in pairs(mBs2) do if k==m then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
  end
- mSec(pg,"LIMITS",5)
- mInput(pg,"Max money $",5000,"LP_UPGRADER_MAX_MONEY",6)
- mInput(pg,"Min item $",0,"LP_UPGRADER_MIN_PRICE",7)
- mInput(pg,"Max item $",50,"LP_UPGRADER_MAX_PRICE",8)
- mSec(pg,"STATS",9);local us=mLbl(pg,"A:0 W:0 L:0 $0",10)
- mBtn(pg,"Reset",C.rd,function() st.upgAttempts=0;st.upgWins=0;st.upgLosses=0;st.upgProfit=0;st.upgSpent=0 end,11)
+ mSec(pg,"LIMITS",6)
+ mInput(pg,"Max money $",5000,"LP_UPGRADER_MAX_MONEY",7)
+ mInput(pg,"Min item $",0,"LP_UPGRADER_MIN_PRICE",8)
+ mInput(pg,"Max item $",50,"LP_UPGRADER_MAX_PRICE",9)
+ mSec(pg,"STATS",10);local us=mLbl(pg,"A:0 W:0 L:0 $0",11)
+ mBtn(pg,"Reset",C.rd,function() st.upgAttempts=0;st.upgWins=0;st.upgLosses=0;st.upgProfit=0;st.upgSpent=0 end,12)
  coroutine.resume(coroutine.create(function() while wait(2) do pcall(function() us.Text="A:"..st.upgAttempts.." W:"..st.upgWins.." L:"..st.upgLosses.." $"..math.floor(st.upgProfit).." Sp:$"..math.floor(st.upgSpent) end) end end))
 end)
 pcall(function()
  local pg=tP["Exploit"]
- mSec(pg,"CLIENT CHANGERS",1)
- mBtn(pg,"Money $999k",C.bl,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local b=c and (c:FindFirstChild("Balance") or c:FindFirstChild("Money"));if b then b.Value=999999;log("$999k") end end) end,2)
+ mSec(pg,"CLIENT",1)
+ mBtn(pg,"Money $999k",C.bl,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local b=c and c:FindFirstChild("Balance");if b then b.Value=999999;log("$999k") end end) end,2)
  mBtn(pg,"Tickets 9999",C.pu,function() pcall(function() local pd=LP:FindFirstChild("PlayerData");local c=pd and pd:FindFirstChild("Currencies");local t=c and c:FindFirstChild("Tickets");if t then t.Value=9999;log("Tix") end end) end,3)
  mSec(pg,"DUPE",5)
  mBtn(pg,"Dupe x1",C.or2,function() local inv=gInv();if not inv then log("No inv");return end;local n=0;for _,i in ipairs(inv:GetChildren()) do if not i:GetAttribute("LPDup") then local cl=i:Clone();cl:SetAttribute("LPDup",true);cl.Parent=inv;n=n+1 end end;log("Duped "..n) end,6)
@@ -417,60 +374,88 @@ local dbgBox
 pcall(function()
  local pg=tP["Debug"]
  mSec(pg,"DEBUG LOGBOOK",1)
- mLbl(pg,"Tap text box -> Select All -> Copy",2)
- local dbgF=Instance.new("Frame");dbgF.Size=UDim2.new(1,0,0,220);dbgF.BackgroundColor3=Color3.fromRGB(5,5,8);dbgF.BorderSizePixel=0;dbgF.LayoutOrder=3;dbgF.Parent=pg
+ mLbl(pg,"Tap textbox -> Select All -> Copy",2)
+ local dbgF=Instance.new("Frame");dbgF.Size=UDim2.new(1,0,0,180);dbgF.BackgroundColor3=Color3.fromRGB(5,5,8);dbgF.BorderSizePixel=0;dbgF.LayoutOrder=3;dbgF.Parent=pg
  pcall(function() Instance.new("UICorner",dbgF).CornerRadius=UDim.new(0,6) end)
  dbgBox=Instance.new("TextBox");dbgBox.Size=UDim2.new(1,-6,1,-6);dbgBox.Position=UDim2.new(0,3,0,3);dbgBox.BackgroundTransparency=1;dbgBox.Text=table.concat(DL,"\n");dbgBox.TextColor3=Color3.fromRGB(0,255,100);dbgBox.TextSize=7;dbgBox.Font=Enum.Font.Code;dbgBox.TextXAlignment=Enum.TextXAlignment.Left;dbgBox.TextYAlignment=Enum.TextYAlignment.Top;dbgBox.TextWrapped=true;dbgBox.ClearTextOnFocus=false;dbgBox.MultiLine=true;dbgBox.TextEditable=false;dbgBox.Parent=dbgF
- mBtn(pg,"REFRESH LOG",C.bl,function() dbgBox.Text=table.concat(DL,"\n") end,4)
- mBtn(pg,"FULL DUMP",C.or2,function()
-  dlog("=== MANUAL DUMP ===")
-  dlog("Bal: "..tostring(gBal()).." Lv: "..tostring(gLvl()))
-  if Rem then dlog("Remotes:");for _,r in ipairs(Rem:GetChildren()) do dlog("  "..r.ClassName..": "..r.Name) end end
-  pcall(function() local pd=LP:FindFirstChild("PlayerData");if pd then dlog("PlayerData:");dumpObj(pd,1) else dlog("No PlayerData") end end)
-  pcall(function()
-   local inv=gInv()
-   if inv then
-    local ch=inv:GetChildren();dlog("Inv: "..#ch.." items")
-    for i=1,math.min(10,#ch) do dlog("  "..ch[i].ClassName..": "..ch[i].Name.." $"..gPrice(ch[i])) end
-   else dlog("No inv") end
-  end)
-  dlog("=== END DUMP ===")
+ mBtn(pg,"REFRESH",C.bl,function() dbgBox.Text=table.concat(DL,"\n") end,4)
+ mBtn(pg,"TEST: Open Free Case",C.gn,function()
+  dlog("=== TEST FREE ===")
+  local ok,ret=tryOpenCase("Free")
+  dlog("Free result: ok="..tostring(ok).." ret="..tostring(ret))
+  dlog("=== END ===")
   dbgBox.Text=table.concat(DL,"\n")
  end,5)
- mBtn(pg,"TEST OPEN CASE",C.pu,function()
-  local fc=_G.LP_FARM_CASE
-  dlog("=== TEST OPEN ===")
-  dlog("Farm case="..tostring(fc).." type="..type(fc))
-  if not fc or fc=="" then dlog("No case!");dbgBox.Text=table.concat(DL,"\n");return end
-  local ok,ret=tryOpenCase(fc)
-  dlog("Result: ok="..tostring(ok).." ret="..tostring(ret))
-  dlog("=== END TEST ===")
+ mBtn(pg,"TEST: Open 50GLOCK Case",C.gn,function()
+  dlog("=== TEST 50GLOCK ===")
+  local ok,ret=tryOpenCase("50GLOCK")
+  dlog("50GLOCK result: ok="..tostring(ok).." ret="..tostring(ret))
+  dlog("=== END ===")
   dbgBox.Text=table.concat(DL,"\n")
  end,6)
- mBtn(pg,"TEST SELL 1",C.or2,function()
+ mBtn(pg,"TEST: Sell cheapest item",C.or2,function()
   dlog("=== TEST SELL ===")
-  local inv=gInv()
-  if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
+  local inv=gInv();if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
   local items=inv:GetChildren()
-  if #items==0 then dlog("Empty");dbgBox.Text=table.concat(DL,"\n");return end
   local best=nil;local bp=math.huge
   for _,it in ipairs(items) do local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end end
-  if best then dlog("Selling: "..best.Name.." $"..bp);trySell(best) else dlog("No sellable") end
-  dlog("=== END TEST ===")
+  if best then
+   dlog("Target: "..best.Name.." $"..bp)
+   trySellItem(best)
+  else dlog("No sellable") end
+  dlog("=== END ===")
   dbgBox.Text=table.concat(DL,"\n")
  end,7)
- mBtn(pg,"CLEAR",C.rd,function() DL={};dlog("Cleared");dbgBox.Text=table.concat(DL,"\n") end,8)
+ mBtn(pg,"TEST: Upgrade cheapest",C.pu,function()
+  dlog("=== TEST UPGRADE ===")
+  if not upR then dlog("upR nil");dbgBox.Text=table.concat(DL,"\n");return end
+  dlog("Upgrade remote: "..upR.ClassName)
+  local inv=gInv();if not inv then dlog("No inv");dbgBox.Text=table.concat(DL,"\n");return end
+  local best=nil;local bp=math.huge
+  for _,it in ipairs(inv:GetChildren()) do local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end end
+  if not best then dlog("No item");dbgBox.Text=table.concat(DL,"\n");return end
+  dlog("Upgrading: "..best.Name.." $"..bp.." x2")
+  local bal1=gBal()
+  local ok1,r1=pcall(function() upR:FireServer(best,2) end)
+  dlog("Fire(inst,2): ok="..tostring(ok1).." r="..tostring(r1))
+  wait(1)
+  local ok2,r2=pcall(function() upR:FireServer(best.Name,2) end)
+  dlog("Fire(name,2): ok="..tostring(ok2).." r="..tostring(r2))
+  wait(1)
+  local ok3,r3=pcall(function() upR:FireServer(best.Name,getWear(best),2) end)
+  dlog("Fire(name,w,2): ok="..tostring(ok3).." r="..tostring(r3))
+  wait(1)
+  local ok4,r4=pcall(function() upR:FireServer({Name=best.Name,Wear=getWear(best)},2) end)
+  dlog("Fire(tbl,2): ok="..tostring(ok4).." r="..tostring(r4))
+  wait(1)
+  local bal2=gBal()
+  dlog("Bal: "..tostring(bal1).."->"..tostring(bal2))
+  dlog("=== END ===")
+  dbgBox.Text=table.concat(DL,"\n")
+ end,8)
+ mBtn(pg,"DUMP ALL",C.or2,function()
+  dlog("=== DUMP ===")
+  dlog("Bal:"..tostring(gBal()).." Lv:"..tostring(gLvl()))
+  if Rem then for _,r in ipairs(Rem:GetChildren()) do dlog("  "..r.ClassName..": "..r.Name) end end
+  pcall(function() local inv=gInv();if inv then for _,i in ipairs(inv:GetChildren()) do
+   local w=getWear(i);dlog("  "..i.Name.." $"..gPrice(i).." W="..(w or "?").." ST="..tostring(getST(i)))
+   local attrs={};pcall(function() for k,v in pairs(i:GetAttributes()) do table.insert(attrs,k.."="..tostring(v)) end end)
+   if #attrs>0 then dlog("    "..table.concat(attrs,", ")) end
+  end end end)
+  dlog("=== END ===")
+  dbgBox.Text=table.concat(DL,"\n")
+ end,9)
+ mBtn(pg,"CLEAR",C.rd,function() DL={};dlog("Cleared");dbgBox.Text="" end,10)
 end)
 pcall(function()
  local pg=tP["Config"]
  mSec(pg,"GENERAL",1);mTog(pg,"Anti-AFK","LP_ANTIAFK",C.gn,2)
- mSec(pg,"INFO",4);mLbl(pg,"LEGENDARY PARADISE v2.2",5);mLbl(pg,"JJSploit - LegendaryRvx",6)
- mBtn(pg,"Destroy GUI",C.rd,function() sg:Destroy() end,8)
+ mSec(pg,"INFO",4);mLbl(pg,"LP v2.3 DEBUG - LegendaryRvx",5)
+ mBtn(pg,"Destroy GUI",C.rd,function() sg:Destroy() end,7)
 end)
 swT("Dash")
-log("v2.2 loaded!")
-log("$"..tostring(math.floor(gBal())).." Lv:"..tostring(gLvl()))
-if GC then log("GC:"..tostring(GC)) else log("No group case") end
+log("v2.3 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
+log("Farm case: ".._G.LP_FARM_CASE)
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_FARM then
@@ -478,15 +463,13 @@ coroutine.resume(coroutine.create(function()
     local fc=_G.LP_FARM_CASE
     if not fc or fc=="" then log("Select case!");wait(3);return end
     st.sessions=st.sessions+1
-    dlog("--- FARM #"..st.sessions.." case="..tostring(fc).." ---")
     for i=1,5 do
      if not _G.LP_FARM then break end
      local ok,ret=tryOpenCase(fc)
      if ok then st.casesOpened=st.casesOpened+1 end
-     dlog("Farm["..i.."] ok="..tostring(ok).." ret="..tostring(ret))
      wait(0.5)
     end
-    log("Farm#"..st.sessions.." done c="..st.casesOpened)
+    log("Farm#"..st.sessions.." c="..st.casesOpened)
    end)
    wait(2)
   end
@@ -496,23 +479,20 @@ coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_SELL then
    pcall(function()
-    local inv=gInv()
-    if not inv then log("No inv");return end
-    local kp=_G.LP_KEEP_ABOVE_PRICE or 900;local mx=_G.LP_SELL_MAX or 50;local n=0
-    local items=inv:GetChildren()
-    dlog("--- SELL: "..#items.." items keep>$"..kp.." max="..mx.." ---")
-    for _,i in ipairs(items) do
+    local inv=gInv();if not inv then return end
+    local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local mx=_G.LP_SELL_MAX or 50;local n=0
+    for _,i in ipairs(inv:GetChildren()) do
      if not _G.LP_SELL or n>=mx then break end
-     local ok2,p=pcall(function() return gPrice(i) end);if not ok2 then p=0 end
+     local p=gPrice(i)
      if p>0 and p<kp then
-      local ok=trySell(i)
+      local ok=trySellItem(i)
       if ok then st.earned=st.earned+p;st.sold=st.sold+1;n=n+1 end
-      wait(0.2)
+      wait(0.3)
      end
     end
-    if n>0 then log("Sold "..n) else dlog("Sell: 0 matched") end
+    if n>0 then log("Sold "..n) end
    end)
-   wait(3)
+   wait(4)
   end
  end
 end))
@@ -520,49 +500,16 @@ coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_LEVEL then
    pcall(function()
-    if not Cases then dlog("Lvl: no Cases");return end
+    if not Cases then return end
     local cc=nil;local cp=math.huge
-    for id,d in pairs(Cases) do
-     if type(d)=="table" and d.Price and type(d.Price)=="number" and d.Price>0 and d.Price<cp then cp=d.Price;cc=id end
+    for id,d in pairs(Cases) do if type(d)=="table" and d.Price and type(d.Price)=="number" and d.Price>0 and d.Price<cp then cp=d.Price;cc=id end end
+    if not cc then return end
+    if gBal()>=cp then
+     local ok=tryOpenCase(cc)
+     if ok then st.casesOpened=st.casesOpened+1;log("Lvl $"..cp) end
     end
-    if not cc then dlog("Lvl: no case");return end
-    local bal=gBal()
-    if bal>=cp then
-     dlog("Lvl: open "..tostring(cc).." $"..cp)
-     local ok,ret=tryOpenCase(cc)
-     if ok then st.casesOpened=st.casesOpened+1;log("LvlC $"..cp) else log("LvlC fail") end
-    else dlog("Lvl: need $"..cp.." have $"..math.floor(bal)) end
    end)
    wait(3)
-  end
- end
-end))
-coroutine.resume(coroutine.create(function()
- while wait(1) do
-  if _G.LP_QUESTS then
-   pcall(function()
-    if not Rem then dlog("Quest: no Rem");return end
-    dlog("--- QUESTS ---")
-    local names={"ClaimQuest","CompleteQuest","ClaimDailyQuest","FinishQuest","QuestReward","ClaimReward"}
-    local found=false
-    for _,n in ipairs(names) do
-     local r=Rem:FindFirstChild(n)
-     if r then
-      dlog("Quest: "..n.." "..r.ClassName)
-      for i=1,10 do pcall(function() r:FireServer(i) end);pcall(function() r:InvokeServer(i) end) end
-      found=true
-     end
-    end
-    if not found then
-     for _,r in ipairs(Rem:GetChildren()) do
-      if string.lower(r.Name):find("quest") or string.lower(r.Name):find("daily") or string.lower(r.Name):find("mission") then
-       dlog("Quest scan: "..r.Name);for i=1,5 do pcall(function() r:FireServer(i) end);pcall(function() r:InvokeServer(i) end) end;found=true
-      end
-     end
-    end
-    if found then log("Quests OK") else dlog("No quest remotes") end
-   end)
-   wait(15)
   end
  end
 end))
@@ -572,24 +519,22 @@ coroutine.resume(coroutine.create(function()
    pcall(function()
     local met=WS:FindFirstChild("Meteorites") or WS:FindFirstChild("Events") or WS:FindFirstChild("Meteors")
     if met then for _,m in ipairs(met:GetChildren()) do if not _G.LP_EVENT then break end;pcall(function() local cd=m:FindFirstChild("ClickDetector");if cd then fireclickdetector(cd) end;local pp=m:FindFirstChild("ProximityPrompt");if pp then fireproximityprompt(pp) end end);wait(0.2) end end
-   end)
-   wait(5)
+   end);wait(5)
   end
  end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do
-  if _G.LP_EXCHANGE and exR then pcall(function() exR:FireServer() end);pcall(function() exR:InvokeServer() end);wait(10) end
+  if _G.LP_EXCHANGE and exR then pcall(function() exR:FireServer() end);wait(10) end
  end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_GIFTS then
    pcall(function()
-    if urR then pcall(function() urR:FireServer() end);pcall(function() urR:InvokeServer() end) end
-    if Rem then for _,n in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward"}) do local r=Rem:FindFirstChild(n);if r then pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end) end end end
-   end)
-   wait(15)
+    if urR then pcall(function() urR:InvokeServer() end) end
+    if Rem then for _,n in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward","PrepareGiftPurchase"}) do local r=Rem:FindFirstChild(n);if r then pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end) end end end
+   end);wait(15)
   end
  end
 end))
@@ -598,30 +543,27 @@ coroutine.resume(coroutine.create(function()
   if _G.LP_UPGRADER and upR then
    pcall(function()
     local maxM=_G.LP_UPGRADER_MAX_MONEY or 5000
-    if st.upgSpent>=maxM then dlog("Upg limit");wait(5);return end
+    if st.upgSpent>=maxM then wait(5);return end
     local inv=gInv();if not inv then return end
     local best=nil;local bp=math.huge
     local mn2=_G.LP_UPGRADER_MIN_PRICE or 0;local mx=_G.LP_UPGRADER_MAX_PRICE or 50
     for _,i in ipairs(inv:GetChildren()) do
-     local ok2,p=pcall(function() return gPrice(i) end);if not ok2 then p=0 end
-     if p>=mn2 and p<=mx and p>0 and p<bp then bp=p;best=i end
+     local p=gPrice(i);if p>=mn2 and p<=mx and p>0 and p<bp then bp=p;best=i end
     end
     if best then
-     if st.upgSpent+bp>maxM then dlog("Upg: exceed");wait(3);return end
+     if st.upgSpent+bp>maxM then wait(3);return end
      local m=_G.LP_UPGRADER_MULT or 2;local bal1=gBal()
      st.upgAttempts=st.upgAttempts+1;st.upgSpent=st.upgSpent+bp
      dlog("Upg: "..best.Name.." $"..bp.." x"..m)
-     local ok,r=pcall(function() return upR:InvokeServer(best,m) end)
-     dlog("Upg Invoke: ok="..tostring(ok).." r="..tostring(r).." type="..type(r))
-     if not ok then pcall(function() upR:FireServer(best,m) end) end
-     wait(1)
+     pcall(function() upR:FireServer(best,m) end)
+     pcall(function() upR:FireServer(best.Name,m) end)
+     pcall(function() upR:FireServer(best.Name,getWear(best),m) end)
+     wait(1.5)
      local bal2=gBal();local diff=bal2-bal1
-     dlog("Upg bal: "..tostring(bal1).." -> "..tostring(bal2))
      if diff>0 then st.upgWins=st.upgWins+1;st.upgProfit=st.upgProfit+diff;log("Upg W +$"..math.floor(diff))
      else st.upgLosses=st.upgLosses+1;st.upgProfit=st.upgProfit+diff;log("Upg L $"..math.floor(diff)) end
-    else dlog("Upg: no item $"..mn2.."-$"..mx) end
-   end)
-   wait(1.5)
+    end
+   end);wait(2)
   end
  end
 end))
@@ -629,50 +571,38 @@ coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_AUTOBATTLE and cbR and abR then
    pcall(function()
-    local bg=_G.LP_BATTLE_BUDGET or 500;local mb=_G.LP_BATTLE_MIN_BAL or 100
-    local bal=gBal();local avail=bal-mb
-    if avail<10 then dlog("AB: low $"..tostring(bal));wait(5);return end
+    local mb=_G.LP_BATTLE_MIN_BAL or 100;local bal=gBal()
+    if bal-mb<10 then wait(5);return end
     local cids={};for id in pairs(_G.LP_BATTLE_CASES) do table.insert(cids,tostring(id)) end
     if #cids==0 then
      if Cases then
-      local rk=_G.LP_BATTLE_RISK or "Medium";local cn={}
-      for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 then table.insert(cn,{id=id,price=d.Price}) end end
+      local cn={};for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 then table.insert(cn,{id=id,price=d.Price}) end end
       table.sort(cn,function(a,b) return a.price<b.price end)
-      local lim=math.min(bg,avail)
-      if rk=="Low" then for _,c in ipairs(cn) do if c.price<=lim*0.3 then table.insert(cids,tostring(c.id)) end end
-      elseif rk=="High" then for i=#cn,1,-1 do if cn[i].price<=lim*0.8 then table.insert(cids,tostring(cn[i].id));break end end
-      else for _,c in ipairs(cn) do if c.price<=lim*0.5 then table.insert(cids,tostring(c.id)) end end end
+      local lim=math.min(_G.LP_BATTLE_BUDGET or 500,bal-mb)
+      for _,c in ipairs(cn) do if c.price<=lim*0.5 then table.insert(cids,tostring(c.id)) end end
      end
     end
     if #cids>0 then
-     local md=_G.LP_BATTLE_MODE or "CRAZY TERMINAL";local bal1=gBal()
-     dlog("AB: "..#cids.." cases mode="..md)
-     local ok,bid=pcall(function() return cbR:InvokeServer(cids,2,md,false) end)
-     dlog("AB create: ok="..tostring(ok).." bid="..tostring(bid))
+     local bal1=gBal()
+     local ok,bid=pcall(function() return cbR:InvokeServer(cids,2,_G.LP_BATTLE_MODE or "CRAZY TERMINAL",false) end)
      if ok and bid then
       wait(0.6);pcall(function() abR:FireServer(tonumber(bid),LP) end)
-      st.battlesPlayed=st.battlesPlayed+1
-      wait(10)
+      st.battlesPlayed=st.battlesPlayed+1;wait(12)
       local bal2=gBal();local diff=bal2-bal1
-      dlog("AB result: "..tostring(bal1).."->"..tostring(bal2))
       if diff>0 then st.battlesWon=st.battlesWon+1;st.battleProfit=st.battleProfit+diff;log("AB W +$"..math.floor(diff))
       else st.battlesLost=st.battlesLost+1;st.battleProfit=st.battleProfit+diff;log("AB L $"..math.floor(diff)) end
      end
-    else dlog("AB: no cases") end
-   end)
-   wait(4)
+    end
+   end);wait(4)
   end
  end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do
-  if _G.LP_ANTIAFK then
-   pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30)
-  end
+  if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end
  end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
 end))
-log("All ready!")
-print("[LP] v2.2 loaded!")
+log("Ready!")
