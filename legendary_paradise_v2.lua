@@ -647,9 +647,16 @@ coroutine.resume(coroutine.create(function()
     local earnCase=_G.LP_XP_EARN_CASE or GC or "Free"
     if _G.LP_FARM and not _G.LP_XPFARM then earnCase=_G.LP_FARM_CASE or GC or "Free" end
     if _G.LP_XPFARM then st.xpPhase="EARNING" end
-    local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
+    -- Free cases (Group, VIP, Free) use qty=5, paid use qty=1
+    local casePrice=0
+    if Cases and Cases[earnCase] and Cases[earnCase].Price then casePrice=Cases[earnCase].Price end
+    local eq=(casePrice<=0) and 5 or 1
     local ebal1=gBal()
-    openCase(earnCase,eq)
+    local ok=openCase(earnCase,eq)
+    if not ok then
+     -- Retry with qty=1 in case qty=5 is rejected
+     if eq>1 then ok=openCase(earnCase,1);eq=1 end
+    end
     wait(0.2);quickSell();wait(0.1)
     local ebal2=gBal();local diff=ebal2-ebal1
     if diff>0 and _G.LP_XPFARM then st.xpEarned=st.xpEarned+diff end
