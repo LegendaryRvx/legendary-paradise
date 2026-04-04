@@ -126,12 +126,14 @@ dlog("GC="..(GC and tostring(GC) or "nil").." Bal="..tostring(gBal()).." Lv="..t
 _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false
 _G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_UPGRADER=false
 _G.LP_ANTIAFK=false;_G.LP_AUTOBATTLE=false;_G.LP_LEVELREWARDS=false
+_G.LP_XPFARM=false
 _G.LP_FARM_CASE=GC or "Free"
 _G.LP_SELL_MAX=50;_G.LP_KEEP_ABOVE_PRICE=500
 _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.LP_UPGRADER_MAX_MONEY=5000
 _G.LP_BATTLE_BUDGET=500;_G.LP_BATTLE_MIN_BAL=100
 _G.LP_BATTLE_MODE="CRAZY TERMINAL";_G.LP_BATTLE_CASES={}
-local st={sessions=0,casesOpened=0,earned=0,sold=0,upgAttempts=0,upgWins=0,upgLosses=0,upgProfit=0,upgSpent=0,battlesPlayed=0,battlesWon=0,battlesLost=0,battleProfit=0}
+_G.LP_XP_BUDGET=2000;_G.LP_XP_CASE=nil;_G.LP_XP_QTY=5;_G.LP_XP_EARN_TARGET=500;_G.LP_XP_EARN_CASE=GC or "Free"
+local st={sessions=0,casesOpened=0,earned=0,sold=0,upgAttempts=0,upgWins=0,upgLosses=0,upgProfit=0,upgSpent=0,battlesPlayed=0,battlesWon=0,battlesLost=0,battleProfit=0,xpSpent=0,xpCases=0,xpEarned=0,xpPhase="idle",xpW=0,xpL=0}
 local function openCase(cid,qty)
  if not ocR then return false end
  qty=qty or 1
@@ -153,6 +155,36 @@ local function sellItems(items)
 end
 local function sellOne(item)
  return sellItems({item})
+end
+local function findUpgradeTarget(srcPrice,mult)
+ if not Items then return nil end
+ local tp=srcPrice*mult;local bestK,bestN,bestW,bestP,bestST,bestDiff=nil,nil,nil,nil,false,math.huge
+ for key,data in pairs(Items) do
+  if type(data)=="table" and data.Wears then
+   local name=data.Name or key
+   for wn,wd in pairs(data.Wears) do
+    if wd.Normal and wd.Normal>0 then
+     local d=math.abs(wd.Normal-tp);if d<bestDiff then bestK=key;bestN=name;bestW=wn;bestP=wd.Normal;bestST=false;bestDiff=d end
+    end
+    if wd.StatTrak and wd.StatTrak>0 then
+     local d=math.abs(wd.StatTrak-tp);if d<bestDiff then bestK=key;bestN=name;bestW=wn;bestP=wd.StatTrak;bestST=true;bestDiff=d end
+    end
+   end
+  end
+ end
+ if bestK then return {Key=bestK,Instance=bestN,Name=bestN,Wear=bestW,Price=bestP,Stattrak=bestST} end
+ return nil
+end
+local function doUpgrade(item,mult)
+ if not upR then return false,"no upR" end
+ local p=gPrice(item);if p<=0 then return false,"no price" end
+ local target=findUpgradeTarget(p,mult)
+ if not target then return false,"no target" end
+ local entry=buildSellEntry(item)
+ dlog("Upg: "..item.Name.." $"..p.." x"..mult.." -> "..target.Name.." $"..target.Price)
+ local ok,r=pcall(function() upR:FireServer({entry},target) end)
+ dlog("  FireServer: ok="..tostring(ok).." r="..tostring(r))
+ return ok,r
 end
 pcall(function()
  if game:GetService("CoreGui"):FindFirstChild("LegendaryParadiseUI") then game:GetService("CoreGui").LegendaryParadiseUI:Destroy() end
@@ -229,7 +261,8 @@ pcall(function()
  logLbl=Instance.new("TextLabel");logLbl.Size=UDim2.new(1,-6,1,-4);logLbl.Position=UDim2.new(0,3,0,2);logLbl.BackgroundTransparency=1;logLbl.Text="...";logLbl.TextColor3=Color3.fromRGB(160,220,160);logLbl.TextSize=8;logLbl.Font=Enum.Font.Code;logLbl.TextXAlignment=Enum.TextXAlignment.Left;logLbl.TextYAlignment=Enum.TextYAlignment.Top;logLbl.TextWrapped=true;logLbl.Parent=lb
  coroutine.resume(coroutine.create(function() while wait(2) do pcall(function()
   il.Text="Lv:"..tostring(gLvl()).." $"..tostring(math.floor(gBal()))
-  sl.Text="S:"..st.sessions.." C:"..st.casesOpened.." Sold:"..st.sold.." $"..math.floor(st.earned)
+  local xpS="";if _G.LP_XPFARM then xpS=" | XP:"..st.xpPhase.." $"..math.floor(st.xpSpent).."/$".._G.LP_XP_BUDGET end
+  sl.Text="S:"..st.sessions.." C:"..st.casesOpened.." Sold:"..st.sold.." $"..math.floor(st.earned)..xpS
  end) end end))
 end)
 pcall(function()
@@ -253,10 +286,46 @@ pcall(function()
  mSec(pg,"AUTO SELL",10);mTog(pg,"Auto Sell","LP_SELL",C.or2,11)
  mInput(pg,"Keep above $",500,"LP_KEEP_ABOVE_PRICE",12)
  mInput(pg,"Max sell/cy",50,"LP_SELL_MAX",13)
- mSec(pg,"AUTO LEVEL",15);mTog(pg,"Auto Level","LP_LEVEL",C.gn,16)
- mSec(pg,"EXTRAS",20);mTog(pg,"Level Rewards","LP_LEVELREWARDS",C.bl,21);mTog(pg,"Events","LP_EVENT",C.pu,22);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,23);mTog(pg,"Gifts","LP_GIFTS",C.gn,24)
- mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;_G.LP_LEVELREWARDS=true;log("All ON");swT("Auto") end,28)
- mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_LEVELREWARDS=false;log("All OFF");swT("Auto") end,29)
+ mSec(pg,"XP FARM",14);mTog(pg,"XP Farm","LP_XPFARM",Color3.fromRGB(255,50,200),15)
+ local xpSl=mLbl(pg,"XP: idle | W:0 L:0 | Spent:$0",16);xpSl.TextColor3=Color3.fromRGB(255,150,220)
+ mInput(pg,"XP Budget $",2000,"LP_XP_BUDGET",17)
+ mInput(pg,"Cases/open",5,"LP_XP_QTY",18)
+ mInput(pg,"Earn target $",500,"LP_XP_EARN_TARGET",19)
+ local xpCl=mLbl(pg,"XP Case: (auto)",20);xpCl.TextColor3=C.ac
+ local xpBs={}
+ local acnXP={}
+ if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Name and d.Price and d.Price>0 and d.Price<=100 then table.insert(acnXP,{id=id,name=d.Name,price=d.Price}) end end;table.sort(acnXP,function(a,b) return a.price<b.price end) end
+ if #acnXP>0 and not _G.LP_XP_CASE then _G.LP_XP_CASE=acnXP[1].id end
+ xpCl.Text="XP Case: "..((_G.LP_XP_CASE and tostring(_G.LP_XP_CASE)) or "auto")
+ local xpFr=Instance.new("Frame");xpFr.Size=UDim2.new(1,0,0,55);xpFr.BackgroundColor3=Color3.fromRGB(15,15,19);xpFr.BorderSizePixel=0;xpFr.LayoutOrder=21;xpFr.Parent=pg
+ pcall(function() Instance.new("UICorner",xpFr).CornerRadius=UDim.new(0,6) end)
+ local xpSc=Instance.new("ScrollingFrame");xpSc.Size=UDim2.new(1,-4,1,-4);xpSc.Position=UDim2.new(0,2,0,2);xpSc.BackgroundTransparency=1;xpSc.BorderSizePixel=0;xpSc.ScrollBarThickness=3;xpSc.CanvasSize=UDim2.new(0,0,0,#acnXP*18+8);xpSc.Parent=xpFr
+ local xpLL=Instance.new("UIListLayout");xpLL.SortOrder=Enum.SortOrder.LayoutOrder;xpLL.Padding=UDim.new(0,1);xpLL.Parent=xpSc
+ for idx,e in ipairs(acnXP) do
+  local sel=(e.id==_G.LP_XP_CASE)
+  local xb2=Instance.new("TextButton");xb2.Size=UDim2.new(1,-4,0,16);xb2.BackgroundColor3=sel and C.ac or C.cd;xb2.Text=e.name.." $"..e.price;xb2.TextColor3=sel and Color3.fromRGB(0,0,0) or C.tx;xb2.TextSize=8;xb2.Font=Enum.Font.Gotham;xb2.TextXAlignment=Enum.TextXAlignment.Left;xb2.BorderSizePixel=0;xb2.LayoutOrder=idx;xb2.Parent=xpSc
+  pcall(function() Instance.new("UICorner",xb2).CornerRadius=UDim.new(0,4) end)
+  xpBs[e.id]=xb2
+  xb2.MouseButton1Click:Connect(function() _G.LP_XP_CASE=e.id;xpCl.Text="XP Case: "..e.name;for k,v in pairs(xpBs) do if k==e.id then v.BackgroundColor3=C.ac;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
+ end
+ local earnCl=mLbl(pg,"Earn Case: "..tostring(_G.LP_XP_EARN_CASE),22);earnCl.TextColor3=C.ac
+ local earnBs={}
+ local earnFr=Instance.new("Frame");earnFr.Size=UDim2.new(1,0,0,45);earnFr.BackgroundColor3=Color3.fromRGB(15,15,19);earnFr.BorderSizePixel=0;earnFr.LayoutOrder=23;earnFr.Parent=pg
+ pcall(function() Instance.new("UICorner",earnFr).CornerRadius=UDim.new(0,6) end)
+ local earnSc=Instance.new("ScrollingFrame");earnSc.Size=UDim2.new(1,-4,1,-4);earnSc.Position=UDim2.new(0,2,0,2);earnSc.BackgroundTransparency=1;earnSc.BorderSizePixel=0;earnSc.ScrollBarThickness=3;earnSc.CanvasSize=UDim2.new(0,0,0,#acn*18+8);earnSc.Parent=earnFr
+ local earnLL=Instance.new("UIListLayout");earnLL.SortOrder=Enum.SortOrder.LayoutOrder;earnLL.Padding=UDim.new(0,1);earnLL.Parent=earnSc
+ for idx,e in ipairs(acn) do
+  local sel2=(e.id==_G.LP_XP_EARN_CASE)
+  local eb=Instance.new("TextButton");eb.Size=UDim2.new(1,-4,0,16);eb.BackgroundColor3=sel2 and C.gn or C.cd;eb.Text=e.name..(e.price>0 and(" $"..e.price) or " FREE");eb.TextColor3=sel2 and Color3.fromRGB(0,0,0) or C.tx;eb.TextSize=8;eb.Font=Enum.Font.Gotham;eb.TextXAlignment=Enum.TextXAlignment.Left;eb.BorderSizePixel=0;eb.LayoutOrder=idx;eb.Parent=earnSc
+  pcall(function() Instance.new("UICorner",eb).CornerRadius=UDim.new(0,4) end)
+  earnBs[e.id]=eb
+  eb.MouseButton1Click:Connect(function() _G.LP_XP_EARN_CASE=e.id;earnCl.Text="Earn Case: "..e.name;for k,v in pairs(earnBs) do if k==e.id then v.BackgroundColor3=C.gn;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
+ end
+ coroutine.resume(coroutine.create(function() while wait(1) do pcall(function() xpSl.Text="XP: "..st.xpPhase.." | W:"..st.xpW.." L:"..st.xpL.." | Spent:$"..math.floor(st.xpSpent).." Cases:"..st.xpCases end) end end))
+ mSec(pg,"AUTO LEVEL (old)",24);mTog(pg,"Auto Level","LP_LEVEL",C.gn,25)
+ mSec(pg,"EXTRAS",26);mTog(pg,"Level Rewards","LP_LEVELREWARDS",C.bl,27);mTog(pg,"Events","LP_EVENT",C.pu,28);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,29);mTog(pg,"Gifts","LP_GIFTS",C.gn,30)
+ mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;_G.LP_LEVELREWARDS=true;_G.LP_XPFARM=true;log("All ON");swT("Auto") end,33)
+ mBtn(pg,"ALL OFF",C.rd,function() _G.LP_FARM=false;_G.LP_SELL=false;_G.LP_EVENT=false;_G.LP_LEVEL=false;_G.LP_EXCHANGE=false;_G.LP_GIFTS=false;_G.LP_LEVELREWARDS=false;_G.LP_XPFARM=false;log("All OFF");swT("Auto") end,34)
 end)
 pcall(function()
  local pg=tP["Battle"]
@@ -416,16 +485,12 @@ pcall(function()
   local best=nil;local bp=math.huge
   for _,it in ipairs(inv:GetChildren()) do if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<bp then bp=p;best=it end end end
   if not best then dlog("No item");dbgBox.Text=table.concat(DL,"\n");return end
-  local uuid=getUUID(best)
-  dlog("Upg: "..best.Name.." $"..bp.." uuid="..(uuid or "nil"))
+  dlog("Upg: "..best.Name.." $"..bp)
   local bal1=gBal();local invB=#inv:GetChildren()
-  local tries={
-   {"uuid,2",function() upR:FireServer(uuid,2) end},
-   {"inst,2",function() upR:FireServer(best,2) end},
-   {"name,2",function() upR:FireServer(best.Name,2) end},
-   {"{entry},2",function() upR:FireServer(buildSellEntry(best),2) end},
-  }
-  for _,t in ipairs(tries) do local ok,r=pcall(t[2]);dlog("  Up["..t[1].."]: ok="..tostring(ok));wait(1) end
+  local m=_G.LP_UPGRADER_MULT or 2
+  local ok,r=doUpgrade(best,m)
+  dlog("Result: ok="..tostring(ok).." r="..tostring(r))
+  wait(1.5)
   local bal2=gBal();local invA=#inv:GetChildren()
   dlog("Bal:"..bal1.."->"..bal2.." Inv:"..invB.."->"..invA)
   dlog("=== END ===");dbgBox.Text=table.concat(DL,"\n")
@@ -448,9 +513,32 @@ end)
 swT("Dash")
 log("v2.5 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
 log("Farm: "..tostring(_G.LP_FARM_CASE))
+-- LEVEL REWARDS: MAX PRIORITY (runs first, fast poll)
+coroutine.resume(coroutine.create(function()
+ local lvls={"LEVEL10","LEVEL20","LEVEL30","LEVEL40","LEVEL50","LEVEL60","LEVEL70","LEVEL80","LEVEL90","LEVELS100","LEVELS110","LEVELS120"}
+ while wait(0.5) do
+  if _G.LP_LEVELREWARDS and ccR then
+   pcall(function()
+    for _,lv in ipairs(lvls) do
+     if not _G.LP_LEVELREWARDS then break end
+     local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
+     if ok and r==true then
+      dlog("LvlRwd "..lv.." ready!")
+      if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
+      if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
+      pcall(function() ocR:InvokeServer(lv,1,false,false) end)
+      log("LEVEL "..lv.." CLAIMED!");wait(0.2)
+     end
+     wait(0.05)
+    end
+   end)
+  end
+ end
+end))
+-- AUTO FARM (standard)
 coroutine.resume(coroutine.create(function()
  while wait(0.1) do
-  if _G.LP_FARM then
+  if _G.LP_FARM and not _G.LP_XPFARM then
    pcall(function()
     local fc=_G.LP_FARM_CASE
     if not fc or fc=="" then log("Select case!");wait(3);return end
@@ -465,6 +553,100 @@ coroutine.resume(coroutine.create(function()
     end
     log("Farm#"..st.sessions.." c="..st.casesOpened..(isGroup and " (x5)" or ""))
    end);wait(0.3)
+  end
+ end
+end))
+-- XP FARM ENGINE (cycle: spend XP budget -> earn back -> repeat)
+coroutine.resume(coroutine.create(function()
+ while wait(0.3) do
+  if _G.LP_XPFARM then
+   pcall(function()
+    local budget=_G.LP_XP_BUDGET or 2000
+    local xpCase=_G.LP_XP_CASE
+    local xpQty=_G.LP_XP_QTY or 5
+    local earnTarget=_G.LP_XP_EARN_TARGET or 500
+    local earnCase=_G.LP_XP_EARN_CASE or GC or "Free"
+    if not xpCase then log("XP: no case!");wait(3);return end
+    -- PHASE 1: Spend money opening cases for XP
+    st.xpPhase="SPENDING"
+    local spent=0;local lvBefore=gLvl()
+    log("XP: Phase1 SPEND $"..budget.." on "..tostring(xpCase).." x"..xpQty)
+    while _G.LP_XPFARM and spent<budget do
+     -- Check level rewards first (priority)
+     if _G.LP_LEVELREWARDS then wait(0.05) end
+     local bal=gBal()
+     local casePrice=0
+     if Cases and Cases[xpCase] and Cases[xpCase].Price then casePrice=Cases[xpCase].Price end
+     local costPerOpen=casePrice*xpQty
+     if costPerOpen<=0 then costPerOpen=xpQty end
+     if bal<costPerOpen then log("XP: no money ($"..math.floor(bal)..")");break end
+     if spent+costPerOpen>budget then log("XP: budget limit");break end
+     local bal1=gBal()
+     local ok=openCase(xpCase,xpQty)
+     wait(0.2)
+     local bal2=gBal()
+     local cost=bal1-bal2
+     if cost>0 then spent=spent+cost;st.xpSpent=st.xpSpent+cost end
+     if ok then st.xpCases=st.xpCases+xpQty;st.xpW=st.xpW+1 else st.xpL=st.xpL+1 end
+     st.casesOpened=st.casesOpened+xpQty
+     -- Sell items we got (keep expensive ones)
+     if _G.LP_SELL and slR then
+      pcall(function()
+       local inv=gInv();if not inv then return end
+       local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local batch={}
+       for _,it in ipairs(inv:GetChildren()) do
+        if #batch>=30 then break end
+        if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<kp then table.insert(batch,it) end end
+       end
+       if #batch>0 then
+        local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
+        pcall(function() slR:InvokeServer(entries) end)
+        st.sold=st.sold+#batch
+       end
+      end)
+     end
+     wait(0.15)
+    end
+    local lvAfter=gLvl()
+    log("XP: Phase1 done. Spent=$"..math.floor(spent).." Lv:"..tostring(lvBefore).."->"..tostring(lvAfter))
+    if not _G.LP_XPFARM then return end
+    -- PHASE 2: Earn back money with Group/VIP cases
+    st.xpPhase="EARNING"
+    local earned2=0
+    log("XP: Phase2 EARN $"..earnTarget.." with "..tostring(earnCase))
+    while _G.LP_XPFARM and earned2<earnTarget do
+     if _G.LP_LEVELREWARDS then wait(0.05) end
+     local isGrp=(GC and earnCase==GC)
+     local eq=isGrp and 5 or 1
+     local bal1=gBal()
+     openCase(earnCase,eq)
+     wait(0.2)
+     -- Sell items
+     if slR then
+      pcall(function()
+       local inv=gInv();if not inv then return end
+       local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local batch={}
+       for _,it in ipairs(inv:GetChildren()) do
+        if #batch>=30 then break end
+        if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<kp then table.insert(batch,it) end end
+       end
+       if #batch>0 then
+        local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
+        pcall(function() slR:InvokeServer(entries) end)
+        st.sold=st.sold+#batch
+       end
+      end)
+     end
+     wait(0.3)
+     local bal2=gBal()
+     local diff=bal2-bal1
+     if diff>0 then earned2=earned2+diff;st.xpEarned=st.xpEarned+diff end
+     st.casesOpened=st.casesOpened+((GC and earnCase==GC) and 5 or 1)
+    end
+    log("XP: Phase2 done. Earned=$"..math.floor(earned2))
+    st.xpPhase="cycle done"
+    wait(1)
+   end)
   end
  end
 end))
@@ -559,11 +741,10 @@ coroutine.resume(coroutine.create(function()
     end
     if best then
      if st.upgSpent+bp>maxM then wait(3);return end
-     local m=_G.LP_UPGRADER_MULT or 2;local uuid=getUUID(best);local bal1=gBal()
+     local m=_G.LP_UPGRADER_MULT or 2;local bal1=gBal()
      st.upgAttempts=st.upgAttempts+1;st.upgSpent=st.upgSpent+bp
-     if uuid then pcall(function() upR:FireServer(uuid,m) end) end
-     pcall(function() upR:FireServer(best,m) end)
-     pcall(function() upR:FireServer(best.Name,m) end)
+     local ok,r=doUpgrade(best,m)
+     dlog("AutoUpg: ok="..tostring(ok).." r="..tostring(r))
      wait(1.5)
      local bal2=gBal();local diff=bal2-bal1
      if diff>0 then st.upgWins=st.upgWins+1;st.upgProfit=st.upgProfit+diff;log("Upg W +$"..math.floor(diff))
@@ -605,35 +786,6 @@ coroutine.resume(coroutine.create(function()
 end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end end
-end))
-coroutine.resume(coroutine.create(function()
- local lvls={"LEVEL10","LEVEL20","LEVEL30","LEVEL40","LEVEL50","LEVEL60","LEVEL70","LEVEL80","LEVEL90","LEVELS100","LEVELS110","LEVELS120"}
- while wait(1) do
-  if _G.LP_LEVELREWARDS then
-   pcall(function()
-    for _,lv in ipairs(lvls) do
-     if not _G.LP_LEVELREWARDS then break end
-     if ccR then
-      local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
-      if ok and r==true then
-       dlog("LvlRwd "..lv.." ready, claiming...")
-       if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
-       if Rem then
-        for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do
-         local rm=Rem:FindFirstChild(rn)
-         if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end
-        end
-       end
-       local ok2,r2=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
-       dlog("  OC("..lv.."): ok="..tostring(ok2).." r="..tostring(r2))
-       wait(0.3)
-      end
-     end
-     wait(0.1)
-    end
-   end);wait(10)
-  end
- end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
