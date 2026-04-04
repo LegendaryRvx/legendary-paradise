@@ -531,75 +531,72 @@ local function quickSell()
   end
  end)
 end
-local lvlIdx=1
-local lvlRetries={}
 local lvlThresholds={LEVEL10=10,LEVEL20=20,LEVEL30=30,LEVEL40=40,LEVEL50=50,LEVEL60=60,LEVEL70=70,LEVEL80=80,LEVEL90=90,LEVELS100=100,LEVELS110=110,LEVELS120=120}
+local lvlCooldowns={} -- lv -> os.time() when cooldown expires
+_G.LP_LEVEL_ACTIVE=false
 -- === PRIORITY ENGINE ===
--- P0: Level cases (dedicated coroutine, 1 level every 10s, checks player level)
+-- P0: Level rewards (pauses other processes while opening)
 coroutine.resume(coroutine.create(function()
- while wait(2) do
+ while wait(5) do
   if _G.LP_LEVELREWARDS and ocR then
    pcall(function()
     local pLvl=gLvl()
-    dlog("LVL check: playerLv="..tostring(pLvl).." idx="..lvlIdx)
-    -- Find next eligible level (skip levels above player level or already retried 3x)
-    local tried=0
-    while tried<#lvlCases do
-     local lv=lvlCases[lvlIdx]
-     if not lv then lvlIdx=1;lv=lvlCases[1] end
+    local now=os.time()
+    for _,lv in ipairs(lvlCases) do
      local req=lvlThresholds[lv] or 999
-     local retries=lvlRetries[lv] or 0
-     if req<=pLvl and retries<3 then
-      -- Try open this level case
-      dlog("LVL trying "..lv.." (req="..req.." pLv="..pLvl.." retry="..retries..")")
-      local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
-      dlog("  OC("..lv.."): ok="..tostring(ok).." r="..tostring(r))
-      if ok and r and r~=false and r~="" and r~=0 then
-       log("LEVEL "..lv.." OPENED!")
-       st.casesOpened=st.casesOpened+1
-       lvlRetries[lv]=0
-       quickSell()
-      else
-       lvlRetries[lv]=retries+1
-       dlog("  "..lv.." fail ("..lvlRetries[lv].."/3)")
-      end
-      -- Also try claim reward
-      if ccR then
-       wait(1)
+     if req<=pLvl then
+      local cdEnd=lvlCooldowns[lv] or 0
+      if cdEnd<=now and ccR then
        local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
-       dlog("  CC("..lv.."): r="..tostring(r2))
-       local canClaim=false
-       if ok2 then
-        if r2==true or r2==0 or r2=="ready" then canClaim=true end
-        if type(r2)=="number" and r2<=0 then canClaim=true end
-       end
-       if canClaim then
-        if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
-        if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
-        log("REWARD "..lv.." CLAIMED!")
+       dlog("LVL CC("..lv.."): r="..tostring(r2).." type="..type(r2))
+       if ok2 and type(r2)=="number" and r2>now then
+        lvlCooldowns[lv]=r2
+        dlog("  "..lv.." CD ("..math.floor(r2-now).."s)")
+        wait(0.5)
+       elseif ok2 and (r2==0 or r2==true or r2==false or (type(r2)=="number" and r2<=now)) then
+        -- READY: pause other processes
+        log("LVL: pausing farm, opening "..lv)
+        _G.LP_LEVEL_ACTIVE=true
+        wait(1)
+        local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+        dlog("  OC("..lv.."): ok="..tostring(ok).." r="..tostring(r))
+        if ok and r and r~=false and r~="" and r~=0 then
+         log("LEVEL "..lv.." OPENED!")
+         st.casesOpened=st.casesOpened+1
+         quickSell()
+        else
+         dlog("  "..lv.." returned false, 10min CD")
+         lvlCooldowns[lv]=now+600
+        end
+        if Rem then
+         wait(1)
+         for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do
+          local rm=Rem:FindFirstChild(rn)
+          if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end
+         end
+        end
+        wait(8)
+        _G.LP_LEVEL_ACTIVE=false
+        log("LVL: farm resumed")
+        return
+       else
+        dlog("  "..lv.." unknown CC: "..tostring(r2))
+        lvlCooldowns[lv]=now+60
+        wait(0.5)
        end
       end
-      lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
-      -- Wait 10 seconds before next level
-      wait(10)
-      return
-     else
-      -- Skip: too high level or exhausted retries
-      if req>pLvl then dlog("  skip "..lv.." (need lv"..req..", you are "..pLvl..")") end
-      lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
-      tried=tried+1
      end
     end
-    -- All levels either done or too high
-    dlog("LVL: no eligible levels, waiting...")
    end)
   end
  end
 end))
--- P1-P4: XP farm / Earn / Farm / Battles
+-- P1-P4: XP farm / Earn / Farm / Battles (paused while LP_LEVEL_ACTIVE)
 coroutine.resume(coroutine.create(function()
  while wait(0.2) do
+  if _G.LP_LEVEL_ACTIVE then wait(1);return end -- yield while level cases are running
   pcall(function()
+   if _G.LP_LEVEL_ACTIVE then return end -- double-check inside pcall
    -- P3: XP FARM (open XP cases while bal > min balance)
    if _G.LP_XPFARM then
     local minBal=_G.LP_XP_BUDGET or 500
