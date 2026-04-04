@@ -132,7 +132,7 @@ _G.LP_SELL_MAX=50;_G.LP_KEEP_ABOVE_PRICE=500
 _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.LP_UPGRADER_MAX_MONEY=5000
 _G.LP_BATTLE_BUDGET=500;_G.LP_BATTLE_MIN_BAL=100
 _G.LP_BATTLE_MODE="CRAZY TERMINAL";_G.LP_BATTLE_CASES={}
-_G.LP_XP_BUDGET=2000;_G.LP_XP_CASE=nil;_G.LP_XP_QTY=5;_G.LP_XP_EARN_TARGET=500;_G.LP_XP_EARN_CASE=GC or "Free"
+_G.LP_XP_BUDGET=500;_G.LP_XP_CASE=nil;_G.LP_XP_QTY=5;_G.LP_XP_EARN_TARGET=500;_G.LP_XP_EARN_CASE=GC or "Free"
 local st={sessions=0,casesOpened=0,earned=0,sold=0,upgAttempts=0,upgWins=0,upgLosses=0,upgProfit=0,upgSpent=0,battlesPlayed=0,battlesWon=0,battlesLost=0,battleProfit=0,xpSpent=0,xpCases=0,xpEarned=0,xpPhase="idle",xpW=0,xpL=0}
 local function openCase(cid,qty)
  if not ocR then return false end
@@ -288,7 +288,7 @@ pcall(function()
  mInput(pg,"Max sell/cy",50,"LP_SELL_MAX",13)
  mSec(pg,"XP FARM",14);mTog(pg,"XP Farm","LP_XPFARM",Color3.fromRGB(255,50,200),15)
  local xpSl=mLbl(pg,"XP: idle | W:0 L:0 | Spent:$0",16);xpSl.TextColor3=Color3.fromRGB(255,150,220)
- mInput(pg,"XP Budget $",2000,"LP_XP_BUDGET",17)
+ mInput(pg,"Min balance $",500,"LP_XP_BUDGET",17)
  mInput(pg,"Cases/open",5,"LP_XP_QTY",18)
  mInput(pg,"Earn target $",500,"LP_XP_EARN_TARGET",19)
  local xpCl=mLbl(pg,"XP Case: (auto)",20);xpCl.TextColor3=C.ac
@@ -321,7 +321,7 @@ pcall(function()
   earnBs[e.id]=eb
   eb.MouseButton1Click:Connect(function() _G.LP_XP_EARN_CASE=e.id;earnCl.Text="Earn Case: "..e.name;for k,v in pairs(earnBs) do if k==e.id then v.BackgroundColor3=C.gn;v.TextColor3=Color3.fromRGB(0,0,0) else v.BackgroundColor3=C.cd;v.TextColor3=C.tx end end end)
  end
- coroutine.resume(coroutine.create(function() while wait(1) do pcall(function() xpSl.Text="XP: "..st.xpPhase.." | W:"..st.xpW.." L:"..st.xpL.." | Spent:$"..math.floor(st.xpSpent).." Cases:"..st.xpCases end) end end))
+ coroutine.resume(coroutine.create(function() while wait(1) do pcall(function() xpSl.Text="XP: "..st.xpPhase.." | W:"..st.xpW.." L:"..st.xpL.." | $"..math.floor(st.xpSpent).." spent | Bal:$"..math.floor(gBal()) end) end end))
  mSec(pg,"AUTO LEVEL (old)",24);mTog(pg,"Auto Level","LP_LEVEL",C.gn,25)
  mSec(pg,"EXTRAS",26);mTog(pg,"Level Rewards","LP_LEVELREWARDS",C.bl,27);mTog(pg,"Events","LP_EVENT",C.pu,28);mTog(pg,"Exchange","LP_EXCHANGE",C.gn,29);mTog(pg,"Gifts","LP_GIFTS",C.gn,30)
  mBtn(pg,"ALL ON",C.gn,function() _G.LP_FARM=true;_G.LP_SELL=true;_G.LP_EVENT=true;_G.LP_LEVEL=true;_G.LP_EXCHANGE=true;_G.LP_GIFTS=true;_G.LP_LEVELREWARDS=true;_G.LP_XPFARM=true;log("All ON");swT("Auto") end,33)
@@ -569,7 +569,7 @@ local function tryLevelRewards()
  return any
 end
 -- === PRIORITY ENGINE (single loop) ===
--- P1: Level cases | P2: Level rewards | P3: XP farm / Auto farm | P4: Battles
+-- P1: Level cases | P2: Level rewards | P3: XP farm | P3.5: Earn cases | P4: Battles
 coroutine.resume(coroutine.create(function()
  while wait(0.1) do
   pcall(function()
@@ -583,66 +583,46 @@ coroutine.resume(coroutine.create(function()
     local claimed=tryLevelRewards()
     if claimed then quickSell();return end
    end
-   -- P3: XP FARM
+   -- P3: XP FARM (open XP cases while bal > min balance)
    if _G.LP_XPFARM then
-    local budget=_G.LP_XP_BUDGET or 2000
+    local minBal=_G.LP_XP_BUDGET or 500
     local xpCase=_G.LP_XP_CASE
     local xpQty=_G.LP_XP_QTY or 5
-    local earnTarget=_G.LP_XP_EARN_TARGET or 500
-    local earnCase=_G.LP_XP_EARN_CASE or GC or "Free"
     if not xpCase then
      if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 and d.Price<=100 then xpCase=id;break end end end
      if xpCase then _G.LP_XP_CASE=xpCase end
     end
     if xpCase then
-     if st.xpSpent<budget then
-      -- PHASE 1: SPENDING (open XP cases)
+     local bal=gBal()
+     local casePrice=0
+     if Cases and Cases[xpCase] and Cases[xpCase].Price then casePrice=Cases[xpCase].Price end
+     local costPerOpen=casePrice*xpQty;if costPerOpen<=0 then costPerOpen=xpQty end
+     if bal>minBal and bal>=costPerOpen then
       st.xpPhase="SPENDING"
       local bal1=gBal()
-      local casePrice=0
-      if Cases and Cases[xpCase] and Cases[xpCase].Price then casePrice=Cases[xpCase].Price end
-      local costPerOpen=casePrice*xpQty;if costPerOpen<=0 then costPerOpen=xpQty end
-      if bal1>=costPerOpen then
-       local ok=openCase(xpCase,xpQty)
-       wait(0.2);local bal2=gBal();local cost=bal1-bal2
-       if cost>0 then st.xpSpent=st.xpSpent+cost end
-       if ok then st.xpCases=st.xpCases+xpQty;st.xpW=st.xpW+1 else st.xpL=st.xpL+1 end
-       st.casesOpened=st.casesOpened+xpQty
-       quickSell()
-      else
-       -- No money for XP, switch to earning
-       st.xpPhase="EARNING"
-       local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
-       local ebal1=gBal();openCase(earnCase,eq);wait(0.2);quickSell();wait(0.2)
-       local ebal2=gBal();local diff=ebal2-ebal1
-       if diff>0 then st.xpEarned=st.xpEarned+diff end
-       st.casesOpened=st.casesOpened+eq
-      end
-     else
-      -- Budget spent, EARNING phase until target
-      st.xpPhase="EARNING"
-      local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
-      local ebal1=gBal();openCase(earnCase,eq);wait(0.2);quickSell();wait(0.2)
-      local ebal2=gBal();local diff=ebal2-ebal1
-      if diff>0 then st.xpEarned=st.xpEarned+diff end
-      st.casesOpened=st.casesOpened+eq
-      if st.xpEarned>=earnTarget then
-       log("XP: Earned $"..math.floor(st.xpEarned).." resetting cycle")
-       st.xpSpent=0;st.xpEarned=0;st.xpPhase="cycle reset"
-      end
+      local ok=openCase(xpCase,xpQty)
+      wait(0.2);local bal2=gBal();local cost=bal1-bal2
+      if cost>0 then st.xpSpent=st.xpSpent+cost end
+      if ok then st.xpCases=st.xpCases+xpQty;st.xpW=st.xpW+1 else st.xpL=st.xpL+1 end
+      st.casesOpened=st.casesOpened+xpQty
+      quickSell()
+      return
      end
-     return
     end
    end
-   -- P3 alt: AUTO FARM (if XP farm is off)
-   if _G.LP_FARM and not _G.LP_XPFARM then
-    local fc=_G.LP_FARM_CASE
-    if fc and fc~="" then
-     st.sessions=st.sessions+1
-     local isGroup=(GC and fc==GC);local qty=isGroup and 5 or 1
-     if openCase(fc,qty) then st.casesOpened=st.casesOpened+qty end
-     log("Farm c="..st.casesOpened..(isGroup and " (x5)" or ""))
-    end
+   -- P3.5: EARN CASES (when XP farm active but no money, or standalone farm)
+   if _G.LP_XPFARM or (_G.LP_FARM and not _G.LP_XPFARM) then
+    local earnCase=_G.LP_XP_EARN_CASE or GC or "Free"
+    if _G.LP_FARM and not _G.LP_XPFARM then earnCase=_G.LP_FARM_CASE or GC or "Free" end
+    if _G.LP_XPFARM then st.xpPhase="EARNING" end
+    local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
+    local ebal1=gBal()
+    openCase(earnCase,eq)
+    wait(0.2);quickSell();wait(0.1)
+    local ebal2=gBal();local diff=ebal2-ebal1
+    if diff>0 and _G.LP_XPFARM then st.xpEarned=st.xpEarned+diff end
+    st.casesOpened=st.casesOpened+eq
+    if _G.LP_FARM and not _G.LP_XPFARM then st.sessions=st.sessions+1 end
     return
    end
    -- P4: AUTO BATTLE (lowest priority)
