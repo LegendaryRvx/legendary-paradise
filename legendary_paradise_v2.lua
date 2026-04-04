@@ -535,58 +535,77 @@ local lvlThresholds={LEVEL10=10,LEVEL20=20,LEVEL30=30,LEVEL40=40,LEVEL50=50,LEVE
 local lvlCooldowns={} -- lv -> os.time() when cooldown expires
 _G.LP_LEVEL_ACTIVE=false
 -- === PRIORITY ENGINE ===
--- P0: Level rewards (pauses other processes while opening)
+-- P0: Level rewards - checks level, scans all eligible cases, pauses farm during cycle
 coroutine.resume(coroutine.create(function()
- while wait(5) do
-  if _G.LP_LEVELREWARDS and ocR then
+ while wait(10) do
+  if _G.LP_LEVELREWARDS and ocR and ccR then
    pcall(function()
     local pLvl=gLvl()
     local now=os.time()
+    -- Build eligible list (only levels <= player level)
+    local eligible={}
     for _,lv in ipairs(lvlCases) do
      local req=lvlThresholds[lv] or 999
-     if req<=pLvl then
-      local cdEnd=lvlCooldowns[lv] or 0
-      if cdEnd<=now and ccR then
-       local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
-       dlog("LVL CC("..lv.."): r="..tostring(r2).." type="..type(r2))
-       if ok2 and type(r2)=="number" and r2>now then
-        lvlCooldowns[lv]=r2
-        dlog("  "..lv.." CD ("..math.floor(r2-now).."s)")
-        wait(0.5)
-       elseif ok2 and (r2==0 or r2==true or r2==false or (type(r2)=="number" and r2<=now)) then
-        -- READY: pause other processes
-        log("LVL: pausing farm, opening "..lv)
-        _G.LP_LEVEL_ACTIVE=true
-        wait(1)
-        local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
-        dlog("  OC("..lv.."): ok="..tostring(ok).." r="..tostring(r))
-        if ok and r and r~=false and r~="" and r~=0 then
-         log("LEVEL "..lv.." OPENED!")
-         st.casesOpened=st.casesOpened+1
-         quickSell()
-        else
-         dlog("  "..lv.." returned false, 10min CD")
-         lvlCooldowns[lv]=now+600
-        end
-        if Rem then
-         wait(1)
-         for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do
-          local rm=Rem:FindFirstChild(rn)
-          if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end
-         end
-        end
-        wait(8)
-        _G.LP_LEVEL_ACTIVE=false
-        log("LVL: farm resumed")
-        return
-       else
-        dlog("  "..lv.." unknown CC: "..tostring(r2))
-        lvlCooldowns[lv]=now+60
-        wait(0.5)
-       end
+     if req<=pLvl then table.insert(eligible,lv) end
+    end
+    if #eligible==0 then dlog("LVL: no eligible (lv"..tostring(pLvl)..")");return end
+    -- First pass: check all cooldowns silently
+    local ready={}
+    for _,lv in ipairs(eligible) do
+     local cdEnd=lvlCooldowns[lv] or 0
+     if cdEnd>now then
+      local left=math.floor(cdEnd-now)
+      dlog("LVL "..lv..": "..left.."s left")
+     else
+      -- Ask server for cooldown
+      local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
+      dlog("LVL CC("..lv.."): "..tostring(r2).." ("..type(r2)..")")
+      if ok2 and type(r2)=="number" and r2>now then
+       lvlCooldowns[lv]=r2
+       dlog("  "..lv..": "..math.floor(r2-now).."s left")
+      elseif ok2 and (r2==0 or r2==true or r2==false or (type(r2)=="number" and r2<=now)) then
+       table.insert(ready,lv)
+      else
+       lvlCooldowns[lv]=now+120 -- unknown, retry in 2min
       end
+      wait(0.5)
      end
     end
+    if #ready==0 then dlog("LVL: all "..#eligible.." on cooldown");return end
+    -- Pause farm and open ready cases one by one
+    log("LVL: "..#ready.." cases ready, pausing farm...")
+    _G.LP_LEVEL_ACTIVE=true
+    wait(2) -- let current farm cycle finish
+    for i,lv in ipairs(ready) do
+     if not _G.LP_LEVELREWARDS then break end
+     -- Re-check level (might have leveled up)
+     local curLvl=gLvl()
+     local req=lvlThresholds[lv] or 999
+     if req>curLvl then dlog("LVL skip "..lv.." (leveled?)");break end
+     log("LVL opening "..lv.." ("..i.."/"..#ready..")")
+     local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+     dlog("  OC("..lv.."): ok="..tostring(ok).." r="..tostring(r))
+     if ok and r and r~=false and r~="" and r~=0 then
+      log("LEVEL "..lv.." OPENED!")
+      st.casesOpened=st.casesOpened+1
+      quickSell()
+     else
+      dlog("  "..lv.." failed, 10min CD")
+      lvlCooldowns[lv]=os.time()+600
+     end
+     -- Try claim reward remotes
+     if Rem then
+      wait(1)
+      for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do
+       local rm=Rem:FindFirstChild(rn)
+       if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end
+      end
+     end
+     -- 10s pause between each level case
+     if i<#ready then wait(10) end
+    end
+    _G.LP_LEVEL_ACTIVE=false
+    log("LVL: cycle done, farm resumed")
    end)
   end
  end
@@ -594,9 +613,8 @@ end))
 -- P1-P4: XP farm / Earn / Farm / Battles (paused while LP_LEVEL_ACTIVE)
 coroutine.resume(coroutine.create(function()
  while wait(0.2) do
-  if _G.LP_LEVEL_ACTIVE then wait(1);return end -- yield while level cases are running
+  if not _G.LP_LEVEL_ACTIVE then
   pcall(function()
-   if _G.LP_LEVEL_ACTIVE then return end -- double-check inside pcall
    -- P3: XP FARM (open XP cases while bal > min balance)
    if _G.LP_XPFARM then
     local minBal=_G.LP_XP_BUDGET or 500
@@ -664,9 +682,9 @@ coroutine.resume(coroutine.create(function()
     end
    end
   end)
+  end -- if not LP_LEVEL_ACTIVE
  end
 end))
--- AUTO SELL (independent coroutine)
 coroutine.resume(coroutine.create(function()
  while wait(2) do
   if _G.LP_SELL then
