@@ -713,13 +713,44 @@ coroutine.resume(coroutine.create(function()
   end
  end
 end))
--- EVENTS (independent)
+-- EVENTS (independent) - TP to meteors + collect
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_EVENT then
    pcall(function()
     local met=WS:FindFirstChild("Meteorites") or WS:FindFirstChild("Events") or WS:FindFirstChild("Meteors")
-    if met then for _,m in ipairs(met:GetChildren()) do if not _G.LP_EVENT then break end;pcall(function() local cd=m:FindFirstChild("ClickDetector");if cd then fireclickdetector(cd) end;local pp=m:FindFirstChild("ProximityPrompt");if pp then fireproximityprompt(pp) end end);wait(0.2) end end
+    if not met then return end
+    local hrp=LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local origPos=hrp.CFrame
+    for _,m in ipairs(met:GetChildren()) do
+     if not _G.LP_EVENT then break end
+     pcall(function()
+      -- Find the meteor's position
+      local pos=nil
+      if m:IsA("BasePart") then pos=m.CFrame
+      elseif m:IsA("Model") and m.PrimaryPart then pos=m.PrimaryPart.CFrame
+      elseif m:IsA("Model") then
+       local p=m:FindFirstChildWhichIsA("BasePart",true)
+       if p then pos=p.CFrame end
+      end
+      if pos then
+       -- TP to meteor
+       hrp.CFrame=pos+Vector3.new(0,3,0)
+       wait(0.3)
+      end
+      -- Try to collect
+      local cd=m:FindFirstChild("ClickDetector")
+      if cd then fireclickdetector(cd) end
+      local pp=m:FindFirstChild("ProximityPrompt")
+      if pp then fireproximityprompt(pp) end
+      -- Also try touch
+      pcall(function() firetouchinterest(hrp,m,0);wait(0.1);firetouchinterest(hrp,m,1) end)
+     end)
+     wait(0.3)
+    end
+    -- TP back to original position
+    pcall(function() if hrp and origPos then hrp.CFrame=origPos end end)
    end);wait(5)
   end
  end
@@ -732,27 +763,14 @@ coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_GIFTS then
    pcall(function()
-    -- Try UpdateRewards with each reward index (1-9 for the 9 timed gifts)
     if urR then
      for i=1,9 do
-      pcall(function() urR:InvokeServer(i) end)
-      wait(0.3)
+      pcall(function() urR:InvokeServer("Gift"..i) end)
+      wait(0.5)
      end
-     -- Also try with no args
-     pcall(function() urR:InvokeServer() end)
+     dlog("GIFTS: claimed Gift1-Gift9")
     end
-    -- Try all known reward remote names with indices
-    if Rem then
-     for _,rn in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward","ClaimReward","Reward","Gifts","Gift","ClaimGifts","CollectGift","CollectGifts","RedeemGift"}) do
-      local r=Rem:FindFirstChild(rn)
-      if r then
-       for i=1,9 do pcall(function() r:FireServer(i) end);pcall(function() r:InvokeServer(i) end) end
-       pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end)
-      end
-     end
-    end
-    dlog("GIFTS: claimed cycle")
-   end);wait(30)
+   end);wait(60)
   end
  end
 end))
