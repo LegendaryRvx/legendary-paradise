@@ -513,145 +513,168 @@ end)
 swT("Dash")
 log("v2.5 loaded $"..math.floor(gBal()).." Lv"..tostring(gLvl()))
 log("Farm: "..tostring(_G.LP_FARM_CASE))
--- LEVEL REWARDS: MAX PRIORITY (runs first, fast poll)
-coroutine.resume(coroutine.create(function()
- local lvls={"LEVEL10","LEVEL20","LEVEL30","LEVEL40","LEVEL50","LEVEL60","LEVEL70","LEVEL80","LEVEL90","LEVELS100","LEVELS110","LEVELS120"}
- while wait(0.5) do
-  if _G.LP_LEVELREWARDS and ccR then
-   pcall(function()
-    for _,lv in ipairs(lvls) do
-     if not _G.LP_LEVELREWARDS then break end
-     local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
-     if ok and r==true then
-      dlog("LvlRwd "..lv.." ready!")
-      if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
-      if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
-      pcall(function() ocR:InvokeServer(lv,1,false,false) end)
-      log("LEVEL "..lv.." CLAIMED!");wait(0.2)
-     end
-     wait(0.05)
-    end
-   end)
+local lvlCases={"LEVEL10","LEVEL20","LEVEL30","LEVEL40","LEVEL50","LEVEL60","LEVEL70","LEVEL80","LEVEL90","LEVELS100","LEVELS110","LEVELS120"}
+local lvlClaimed={}
+local function quickSell()
+ if not slR then return end
+ pcall(function()
+  local inv=gInv();if not inv then return end
+  local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local batch={}
+  for _,it in ipairs(inv:GetChildren()) do
+   if #batch>=30 then break end
+   if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<kp then table.insert(batch,it) end end
+  end
+  if #batch>0 then
+   local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
+   pcall(function() slR:InvokeServer(entries) end)
+   st.sold=st.sold+#batch
+  end
+ end)
+end
+local function tryLevelCases()
+ local any=false
+ for _,lv in ipairs(lvlCases) do
+  if not lvlClaimed[lv] then
+   local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+   dlog("LVL OPEN "..lv..": ok="..tostring(ok).." r="..tostring(r))
+   if ok and r and r~=false and r~="" and r~=0 then
+    any=true;log("LEVEL "..lv.." OPENED!")
+    st.casesOpened=st.casesOpened+1;wait(0.15)
+   else
+    lvlClaimed[lv]=true;dlog("  "..lv.." skip (claimed/locked)")
+   end
   end
  end
-end))
--- AUTO FARM (standard)
+ return any
+end
+local function tryLevelRewards()
+ if not ccR then return false end
+ local any=false
+ for _,lv in ipairs(lvlCases) do
+  local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
+  dlog("LvlRwd CHK "..lv..": r="..tostring(r).." type="..type(r))
+  local canClaim=false
+  if ok then
+   if r==true or r==0 or r=="ready" or r=="Ready" then canClaim=true end
+   if type(r)=="number" and r<=0 then canClaim=true end
+  end
+  if canClaim then
+   dlog("LvlRwd "..lv.." CLAIMING")
+   if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
+   if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
+   pcall(function() ocR:InvokeServer(lv,1,false,false) end)
+   any=true;log("REWARD "..lv.." CLAIMED!");wait(0.2)
+  end
+ end
+ return any
+end
+-- === PRIORITY ENGINE (single loop) ===
+-- P1: Level cases | P2: Level rewards | P3: XP farm / Auto farm | P4: Battles
 coroutine.resume(coroutine.create(function()
  while wait(0.1) do
-  if _G.LP_FARM and not _G.LP_XPFARM then
-   pcall(function()
-    local fc=_G.LP_FARM_CASE
-    if not fc or fc=="" then log("Select case!");wait(3);return end
-    st.sessions=st.sessions+1
-    local isGroup=(GC and fc==GC)
-    local qty=isGroup and 5 or 1
-    local reps=isGroup and 2 or 10
-    for i=1,reps do
-     if not _G.LP_FARM then break end
-     if openCase(fc,qty) then st.casesOpened=st.casesOpened+qty end
-     wait(0.15)
-    end
-    log("Farm#"..st.sessions.." c="..st.casesOpened..(isGroup and " (x5)" or ""))
-   end);wait(0.3)
-  end
- end
-end))
--- XP FARM ENGINE (cycle: spend XP budget -> earn back -> repeat)
-coroutine.resume(coroutine.create(function()
- while wait(0.3) do
-  if _G.LP_XPFARM then
-   pcall(function()
+  pcall(function()
+   -- P1: LEVEL CASES (highest priority, always try first)
+   if _G.LP_LEVELREWARDS and ocR then
+    local opened=tryLevelCases()
+    if opened then quickSell();return end
+   end
+   -- P2: LEVEL REWARDS
+   if _G.LP_LEVELREWARDS then
+    local claimed=tryLevelRewards()
+    if claimed then quickSell();return end
+   end
+   -- P3: XP FARM
+   if _G.LP_XPFARM then
     local budget=_G.LP_XP_BUDGET or 2000
     local xpCase=_G.LP_XP_CASE
     local xpQty=_G.LP_XP_QTY or 5
     local earnTarget=_G.LP_XP_EARN_TARGET or 500
     local earnCase=_G.LP_XP_EARN_CASE or GC or "Free"
-    if not xpCase then log("XP: no case!");wait(3);return end
-    -- PHASE 1: Spend money opening cases for XP
-    st.xpPhase="SPENDING"
-    local spent=0;local lvBefore=gLvl()
-    log("XP: Phase1 SPEND $"..budget.." on "..tostring(xpCase).." x"..xpQty)
-    while _G.LP_XPFARM and spent<budget do
-     -- Check level rewards first (priority)
-     if _G.LP_LEVELREWARDS then wait(0.05) end
-     local bal=gBal()
-     local casePrice=0
-     if Cases and Cases[xpCase] and Cases[xpCase].Price then casePrice=Cases[xpCase].Price end
-     local costPerOpen=casePrice*xpQty
-     if costPerOpen<=0 then costPerOpen=xpQty end
-     if bal<costPerOpen then log("XP: no money ($"..math.floor(bal)..")");break end
-     if spent+costPerOpen>budget then log("XP: budget limit");break end
-     local bal1=gBal()
-     local ok=openCase(xpCase,xpQty)
-     wait(0.2)
-     local bal2=gBal()
-     local cost=bal1-bal2
-     if cost>0 then spent=spent+cost;st.xpSpent=st.xpSpent+cost end
-     if ok then st.xpCases=st.xpCases+xpQty;st.xpW=st.xpW+1 else st.xpL=st.xpL+1 end
-     st.casesOpened=st.casesOpened+xpQty
-     -- Sell items we got (keep expensive ones)
-     if _G.LP_SELL and slR then
-      pcall(function()
-       local inv=gInv();if not inv then return end
-       local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local batch={}
-       for _,it in ipairs(inv:GetChildren()) do
-        if #batch>=30 then break end
-        if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<kp then table.insert(batch,it) end end
-       end
-       if #batch>0 then
-        local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
-        pcall(function() slR:InvokeServer(entries) end)
-        st.sold=st.sold+#batch
-       end
-      end)
-     end
-     wait(0.15)
+    if not xpCase then
+     if Cases then for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 and d.Price<=100 then xpCase=id;break end end end
+     if xpCase then _G.LP_XP_CASE=xpCase end
     end
-    local lvAfter=gLvl()
-    log("XP: Phase1 done. Spent=$"..math.floor(spent).." Lv:"..tostring(lvBefore).."->"..tostring(lvAfter))
-    if not _G.LP_XPFARM then return end
-    -- PHASE 2: Earn back money with Group/VIP cases
-    st.xpPhase="EARNING"
-    local earned2=0
-    log("XP: Phase2 EARN $"..earnTarget.." with "..tostring(earnCase))
-    while _G.LP_XPFARM and earned2<earnTarget do
-     if _G.LP_LEVELREWARDS then wait(0.05) end
-     local isGrp=(GC and earnCase==GC)
-     local eq=isGrp and 5 or 1
-     local bal1=gBal()
-     openCase(earnCase,eq)
-     wait(0.2)
-     -- Sell items
-     if slR then
-      pcall(function()
-       local inv=gInv();if not inv then return end
-       local kp=_G.LP_KEEP_ABOVE_PRICE or 500;local batch={}
-       for _,it in ipairs(inv:GetChildren()) do
-        if #batch>=30 then break end
-        if not it:GetAttribute("Locked") then local p=gPrice(it);if p>0 and p<kp then table.insert(batch,it) end end
-       end
-       if #batch>0 then
-        local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
-        pcall(function() slR:InvokeServer(entries) end)
-        st.sold=st.sold+#batch
-       end
-      end)
+    if xpCase then
+     if st.xpSpent<budget then
+      -- PHASE 1: SPENDING (open XP cases)
+      st.xpPhase="SPENDING"
+      local bal1=gBal()
+      local casePrice=0
+      if Cases and Cases[xpCase] and Cases[xpCase].Price then casePrice=Cases[xpCase].Price end
+      local costPerOpen=casePrice*xpQty;if costPerOpen<=0 then costPerOpen=xpQty end
+      if bal1>=costPerOpen then
+       local ok=openCase(xpCase,xpQty)
+       wait(0.2);local bal2=gBal();local cost=bal1-bal2
+       if cost>0 then st.xpSpent=st.xpSpent+cost end
+       if ok then st.xpCases=st.xpCases+xpQty;st.xpW=st.xpW+1 else st.xpL=st.xpL+1 end
+       st.casesOpened=st.casesOpened+xpQty
+       quickSell()
+      else
+       -- No money for XP, switch to earning
+       st.xpPhase="EARNING"
+       local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
+       local ebal1=gBal();openCase(earnCase,eq);wait(0.2);quickSell();wait(0.2)
+       local ebal2=gBal();local diff=ebal2-ebal1
+       if diff>0 then st.xpEarned=st.xpEarned+diff end
+       st.casesOpened=st.casesOpened+eq
+      end
+     else
+      -- Budget spent, EARNING phase until target
+      st.xpPhase="EARNING"
+      local isGrp=(GC and earnCase==GC);local eq=isGrp and 5 or 1
+      local ebal1=gBal();openCase(earnCase,eq);wait(0.2);quickSell();wait(0.2)
+      local ebal2=gBal();local diff=ebal2-ebal1
+      if diff>0 then st.xpEarned=st.xpEarned+diff end
+      st.casesOpened=st.casesOpened+eq
+      if st.xpEarned>=earnTarget then
+       log("XP: Earned $"..math.floor(st.xpEarned).." resetting cycle")
+       st.xpSpent=0;st.xpEarned=0;st.xpPhase="cycle reset"
+      end
      end
-     wait(0.3)
-     local bal2=gBal()
-     local diff=bal2-bal1
-     if diff>0 then earned2=earned2+diff;st.xpEarned=st.xpEarned+diff end
-     st.casesOpened=st.casesOpened+((GC and earnCase==GC) and 5 or 1)
+     return
     end
-    log("XP: Phase2 done. Earned=$"..math.floor(earned2))
-    st.xpPhase="cycle done"
-    wait(1)
-   end)
-  end
+   end
+   -- P3 alt: AUTO FARM (if XP farm is off)
+   if _G.LP_FARM and not _G.LP_XPFARM then
+    local fc=_G.LP_FARM_CASE
+    if fc and fc~="" then
+     st.sessions=st.sessions+1
+     local isGroup=(GC and fc==GC);local qty=isGroup and 5 or 1
+     if openCase(fc,qty) then st.casesOpened=st.casesOpened+qty end
+     log("Farm c="..st.casesOpened..(isGroup and " (x5)" or ""))
+    end
+    return
+   end
+   -- P4: AUTO BATTLE (lowest priority)
+   if _G.LP_AUTOBATTLE and cbR and abR then
+    local mb=_G.LP_BATTLE_MIN_BAL or 100;local bal=gBal()
+    if bal-mb>=10 then
+     local cids={};for id in pairs(_G.LP_BATTLE_CASES) do table.insert(cids,tostring(id)) end
+     if #cids==0 and Cases then
+      local cn={};for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 and d.ForBattles then table.insert(cn,{id=id,price=d.Price}) end end
+      table.sort(cn,function(a,b) return a.price<b.price end)
+      local lim=math.min(_G.LP_BATTLE_BUDGET or 500,bal-mb)
+      for _,c in ipairs(cn) do if c.price<=lim*0.5 then table.insert(cids,tostring(c.id)) end end
+     end
+     if #cids>0 then
+      local bal1=gBal()
+      local ok,bid=pcall(function() return cbR:InvokeServer(cids,2,_G.LP_BATTLE_MODE or "CRAZY TERMINAL",false) end)
+      if ok and bid then
+       wait(0.6);pcall(function() abR:FireServer(tonumber(bid),LP) end)
+       st.battlesPlayed=st.battlesPlayed+1;wait(12)
+       local bal2=gBal();local diff=bal2-bal1
+       if diff>0 then st.battlesWon=st.battlesWon+1;st.battleProfit=st.battleProfit+diff;log("AB W +$"..math.floor(diff))
+       else st.battlesLost=st.battlesLost+1;st.battleProfit=st.battleProfit+diff;log("AB L $"..math.floor(diff)) end
+      end
+     end
+    end
+   end
+  end)
  end
 end))
+-- AUTO SELL (independent coroutine)
 coroutine.resume(coroutine.create(function()
- while wait(1) do
+ while wait(2) do
   if _G.LP_SELL then
    pcall(function()
     local inv=gInv();if not inv then return end
@@ -659,49 +682,19 @@ coroutine.resume(coroutine.create(function()
     local batch={}
     for _,i in ipairs(inv:GetChildren()) do
      if #batch>=mx then break end
-     if not i:GetAttribute("Locked") then
-      local p=gPrice(i)
-      if p>0 and p<kp then table.insert(batch,i) end
-     end
+     if not i:GetAttribute("Locked") then local p=gPrice(i);if p>0 and p<kp then table.insert(batch,i) end end
     end
     if #batch>0 then
-     local entries={}
-     for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
-     local bal1=gBal()
-     local ok=pcall(function() slR:InvokeServer(entries) end)
-     wait(0.5)
-     local bal2=gBal()
-     if bal2>bal1 then
-      local earned=bal2-bal1;st.earned=st.earned+earned;st.sold=st.sold+#batch
-      log("Sold "..#batch.." +$"..math.floor(earned))
-     else
-      for _,item in ipairs(batch) do
-       if not _G.LP_SELL then break end
-       sellOne(item)
-       wait(0.3)
-       local bal3=gBal()
-       if bal3>bal1 then st.earned=st.earned+(bal3-bal1);st.sold=st.sold+1;bal1=bal3 end
-      end
-     end
-    end
-   end);wait(4)
-  end
- end
-end))
-coroutine.resume(coroutine.create(function()
- while wait(1) do
-  if _G.LP_LEVEL then
-   pcall(function()
-    if not Cases then return end
-    local cc=nil;local cp=math.huge
-    for id,d in pairs(Cases) do if type(d)=="table" and d.Price and type(d.Price)=="number" and d.Price>0 and d.Price<cp then cp=d.Price;cc=id end end
-    if cc and gBal()>=cp then
-     if openCase(cc) then st.casesOpened=st.casesOpened+1;log("Lvl $"..cp) end
+     local entries={};for _,item in ipairs(batch) do table.insert(entries,buildSellEntry(item)) end
+     local bal1=gBal();pcall(function() slR:InvokeServer(entries) end);wait(0.5);local bal2=gBal()
+     if bal2>bal1 then st.earned=st.earned+(bal2-bal1);st.sold=st.sold+#batch;log("Sold "..#batch.." +$"..math.floor(bal2-bal1))
+     else for _,item in ipairs(batch) do if not _G.LP_SELL then break end;sellOne(item);wait(0.3) end end
     end
    end);wait(3)
   end
  end
 end))
+-- EVENTS (independent)
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_EVENT then
@@ -712,6 +705,7 @@ coroutine.resume(coroutine.create(function()
   end
  end
 end))
+-- EXCHANGE/GIFTS (independent)
 coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_EXCHANGE and exR then pcall(function() exR:FireServer() end);wait(10) end end
 end))
@@ -725,6 +719,7 @@ coroutine.resume(coroutine.create(function()
   end
  end
 end))
+-- UPGRADER (independent)
 coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_UPGRADER and upR then
@@ -745,8 +740,7 @@ coroutine.resume(coroutine.create(function()
      st.upgAttempts=st.upgAttempts+1;st.upgSpent=st.upgSpent+bp
      local ok,r=doUpgrade(best,m)
      dlog("AutoUpg: ok="..tostring(ok).." r="..tostring(r))
-     wait(1.5)
-     local bal2=gBal();local diff=bal2-bal1
+     wait(1.5);local bal2=gBal();local diff=bal2-bal1
      if diff>0 then st.upgWins=st.upgWins+1;st.upgProfit=st.upgProfit+diff;log("Upg W +$"..math.floor(diff))
      else st.upgLosses=st.upgLosses+1;st.upgProfit=st.upgProfit+diff;log("Upg L") end
     end
@@ -755,37 +749,11 @@ coroutine.resume(coroutine.create(function()
  end
 end))
 coroutine.resume(coroutine.create(function()
- while wait(1) do
-  if _G.LP_AUTOBATTLE and cbR and abR then
-   pcall(function()
-    local mb=_G.LP_BATTLE_MIN_BAL or 100;local bal=gBal()
-    if bal-mb<10 then wait(5);return end
-    local cids={};for id in pairs(_G.LP_BATTLE_CASES) do table.insert(cids,tostring(id)) end
-    if #cids==0 then
-     if Cases then
-      local cn={};for id,d in pairs(Cases) do if type(d)=="table" and d.Price and d.Price>0 and d.ForBattles then table.insert(cn,{id=id,price=d.Price}) end end
-      table.sort(cn,function(a,b) return a.price<b.price end)
-      local lim=math.min(_G.LP_BATTLE_BUDGET or 500,bal-mb)
-      for _,c in ipairs(cn) do if c.price<=lim*0.5 then table.insert(cids,tostring(c.id)) end end
-     end
-    end
-    if #cids>0 then
-     local bal1=gBal()
-     local ok,bid=pcall(function() return cbR:InvokeServer(cids,2,_G.LP_BATTLE_MODE or "CRAZY TERMINAL",false) end)
-     if ok and bid then
-      wait(0.6);pcall(function() abR:FireServer(tonumber(bid),LP) end)
-      st.battlesPlayed=st.battlesPlayed+1;wait(12)
-      local bal2=gBal();local diff=bal2-bal1
-      if diff>0 then st.battlesWon=st.battlesWon+1;st.battleProfit=st.battleProfit+diff;log("AB W +$"..math.floor(diff))
-      else st.battlesLost=st.battlesLost+1;st.battleProfit=st.battleProfit+diff;log("AB L $"..math.floor(diff)) end
-     end
-    end
-   end);wait(4)
-  end
- end
-end))
-coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end end
+end))
+-- Reset level claimed cache every 60s (in case player leveled up)
+coroutine.resume(coroutine.create(function()
+ while wait(60) do lvlClaimed={};dlog("LvlCache reset") end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
