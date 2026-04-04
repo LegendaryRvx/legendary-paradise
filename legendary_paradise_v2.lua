@@ -132,10 +132,11 @@ _G.LP_UPGRADER_MIN_PRICE=0;_G.LP_UPGRADER_MAX_PRICE=50;_G.LP_UPGRADER_MULT=2;_G.
 _G.LP_BATTLE_BUDGET=500;_G.LP_BATTLE_MIN_BAL=100
 _G.LP_BATTLE_MODE="CRAZY TERMINAL";_G.LP_BATTLE_CASES={}
 local st={sessions=0,casesOpened=0,earned=0,sold=0,upgAttempts=0,upgWins=0,upgLosses=0,upgProfit=0,upgSpent=0,battlesPlayed=0,battlesWon=0,battlesLost=0,battleProfit=0}
-local function openCase(cid)
+local function openCase(cid,qty)
  if not ocR then return false end
- local ok,r=pcall(function() return ocR:InvokeServer(cid,1,false,false) end)
- dlog("OC("..tostring(cid).."): ok="..tostring(ok).." r="..tostring(r))
+ qty=qty or 1
+ local ok,r=pcall(function() return ocR:InvokeServer(cid,qty,false,false) end)
+ dlog("OC("..tostring(cid).."x"..qty.."): ok="..tostring(ok).." r="..tostring(r))
  return ok and r~=false
 end
 local function buildSellEntry(item)
@@ -454,12 +455,15 @@ coroutine.resume(coroutine.create(function()
     local fc=_G.LP_FARM_CASE
     if not fc or fc=="" then log("Select case!");wait(3);return end
     st.sessions=st.sessions+1
-    for i=1,10 do
+    local isGroup=(GC and fc==GC)
+    local qty=isGroup and 5 or 1
+    local reps=isGroup and 2 or 10
+    for i=1,reps do
      if not _G.LP_FARM then break end
-     if openCase(fc) then st.casesOpened=st.casesOpened+1 end
+     if openCase(fc,qty) then st.casesOpened=st.casesOpened+qty end
      wait(0.15)
     end
-    log("Farm#"..st.sessions.." c="..st.casesOpened)
+    log("Farm#"..st.sessions.." c="..st.casesOpened..(isGroup and " (x5)" or ""))
    end);wait(0.3)
   end
  end
