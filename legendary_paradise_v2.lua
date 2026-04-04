@@ -732,9 +732,27 @@ coroutine.resume(coroutine.create(function()
  while wait(1) do
   if _G.LP_GIFTS then
    pcall(function()
-    if urR then pcall(function() urR:InvokeServer() end) end
-    if Rem then for _,rn in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward"}) do local r=Rem:FindFirstChild(rn);if r then pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end) end end end
-   end);wait(15)
+    -- Try UpdateRewards with each reward index (1-9 for the 9 timed gifts)
+    if urR then
+     for i=1,9 do
+      pcall(function() urR:InvokeServer(i) end)
+      wait(0.3)
+     end
+     -- Also try with no args
+     pcall(function() urR:InvokeServer() end)
+    end
+    -- Try all known reward remote names with indices
+    if Rem then
+     for _,rn in ipairs({"CollectReward","ClaimGift","ClaimDailyReward","DailyReward","FreeReward","ClaimReward","Reward","Gifts","Gift","ClaimGifts","CollectGift","CollectGifts","RedeemGift"}) do
+      local r=Rem:FindFirstChild(rn)
+      if r then
+       for i=1,9 do pcall(function() r:FireServer(i) end);pcall(function() r:InvokeServer(i) end) end
+       pcall(function() r:FireServer() end);pcall(function() r:InvokeServer() end)
+      end
+     end
+    end
+    dlog("GIFTS: claimed cycle")
+   end);wait(30)
   end
  end
 end))
