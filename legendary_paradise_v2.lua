@@ -533,51 +533,65 @@ local function quickSell()
 end
 local lvlIdx=1
 local lvlRetries={}
-local lvlLastRun=0
-local lvlOpened=false
+local lvlThresholds={LEVEL10=10,LEVEL20=20,LEVEL30=30,LEVEL40=40,LEVEL50=50,LEVEL60=60,LEVEL70=70,LEVEL80=80,LEVEL90=90,LEVELS100=100,LEVELS110=110,LEVELS120=120}
 -- === PRIORITY ENGINE ===
--- P0: Level cases (dedicated coroutine, 1 level per tick with waits)
+-- P0: Level cases (dedicated coroutine, 1 level every 10s, checks player level)
 coroutine.resume(coroutine.create(function()
- while wait(0.5) do
+ while wait(2) do
   if _G.LP_LEVELREWARDS and ocR then
    pcall(function()
-    local lv=lvlCases[lvlIdx]
-    if not lv then lvlIdx=1;return end
-    local retries=lvlRetries[lv] or 0
-    if retries>=5 then
-     lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
-     return
-    end
-    -- Try open level case
-    local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
-    dlog("LVL["..lvlIdx.."] "..lv..": ok="..tostring(ok).." r="..tostring(r))
-    if ok and r and r~=false and r~="" and r~=0 then
-     log("LEVEL "..lv.." OPENED!")
-     st.casesOpened=st.casesOpened+1
-     lvlRetries[lv]=0;lvlOpened=true
-     quickSell()
-     wait(1)
-    else
-     lvlRetries[lv]=retries+1
-    end
-    -- Also try claim via CheckCooldown
-    if ccR then
-     local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
-     dlog("  CC("..lv.."): r="..tostring(r2))
-     local canClaim=false
-     if ok2 then
-      if r2==true or r2==0 or r2=="ready" then canClaim=true end
-      if type(r2)=="number" and r2<=0 then canClaim=true end
+    local pLvl=gLvl()
+    dlog("LVL check: playerLv="..tostring(pLvl).." idx="..lvlIdx)
+    -- Find next eligible level (skip levels above player level or already retried 3x)
+    local tried=0
+    while tried<#lvlCases do
+     local lv=lvlCases[lvlIdx]
+     if not lv then lvlIdx=1;lv=lvlCases[1] end
+     local req=lvlThresholds[lv] or 999
+     local retries=lvlRetries[lv] or 0
+     if req<=pLvl and retries<3 then
+      -- Try open this level case
+      dlog("LVL trying "..lv.." (req="..req.." pLv="..pLvl.." retry="..retries..")")
+      local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+      dlog("  OC("..lv.."): ok="..tostring(ok).." r="..tostring(r))
+      if ok and r and r~=false and r~="" and r~=0 then
+       log("LEVEL "..lv.." OPENED!")
+       st.casesOpened=st.casesOpened+1
+       lvlRetries[lv]=0
+       quickSell()
+      else
+       lvlRetries[lv]=retries+1
+       dlog("  "..lv.." fail ("..lvlRetries[lv].."/3)")
+      end
+      -- Also try claim reward
+      if ccR then
+       wait(1)
+       local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
+       dlog("  CC("..lv.."): r="..tostring(r2))
+       local canClaim=false
+       if ok2 then
+        if r2==true or r2==0 or r2=="ready" then canClaim=true end
+        if type(r2)=="number" and r2<=0 then canClaim=true end
+       end
+       if canClaim then
+        if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
+        if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
+        log("REWARD "..lv.." CLAIMED!")
+       end
+      end
+      lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
+      -- Wait 10 seconds before next level
+      wait(10)
+      return
+     else
+      -- Skip: too high level or exhausted retries
+      if req>pLvl then dlog("  skip "..lv.." (need lv"..req..", you are "..pLvl..")") end
+      lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
+      tried=tried+1
      end
-     if canClaim then
-      dlog("  CLAIMING "..lv)
-      if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
-      if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
-      log("REWARD "..lv.." CLAIMED!")
-      wait(0.5)
-     end
     end
-    lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
+    -- All levels either done or too high
+    dlog("LVL: no eligible levels, waiting...")
    end)
   end
  end
@@ -734,9 +748,9 @@ end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end end
 end))
--- Reset level retries every 30s (in case player leveled up)
+-- Reset level retries every 2 min (in case player leveled up)
 coroutine.resume(coroutine.create(function()
- while wait(30) do lvlRetries={};dlog("LvlRetries reset") end
+ while wait(120) do lvlRetries={};lvlIdx=1;dlog("LvlRetries reset") end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
