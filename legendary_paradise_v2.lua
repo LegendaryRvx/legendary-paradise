@@ -531,58 +531,61 @@ local function quickSell()
   end
  end)
 end
-local function tryLevelCases()
- local any=false
- for _,lv in ipairs(lvlCases) do
-  if not lvlClaimed[lv] then
-   local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
-   dlog("LVL OPEN "..lv..": ok="..tostring(ok).." r="..tostring(r))
-   if ok and r and r~=false and r~="" and r~=0 then
-    any=true;log("LEVEL "..lv.." OPENED!")
-    st.casesOpened=st.casesOpened+1;wait(0.15)
-   else
-    lvlClaimed[lv]=true;dlog("  "..lv.." skip (claimed/locked)")
-   end
-  end
- end
- return any
-end
-local function tryLevelRewards()
- if not ccR then return false end
- local any=false
- for _,lv in ipairs(lvlCases) do
-  local ok,r=pcall(function() return ccR:InvokeServer(lv) end)
-  dlog("LvlRwd CHK "..lv..": r="..tostring(r).." type="..type(r))
-  local canClaim=false
-  if ok then
-   if r==true or r==0 or r=="ready" or r=="Ready" then canClaim=true end
-   if type(r)=="number" and r<=0 then canClaim=true end
-  end
-  if canClaim then
-   dlog("LvlRwd "..lv.." CLAIMING")
-   if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
-   if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
-   pcall(function() ocR:InvokeServer(lv,1,false,false) end)
-   any=true;log("REWARD "..lv.." CLAIMED!");wait(0.2)
-  end
- end
- return any
-end
--- === PRIORITY ENGINE (single loop) ===
--- P1: Level cases | P2: Level rewards | P3: XP farm | P3.5: Earn cases | P4: Battles
+local lvlIdx=1
+local lvlRetries={}
+local lvlLastRun=0
+local lvlOpened=false
+-- === PRIORITY ENGINE ===
+-- P0: Level cases (dedicated coroutine, 1 level per tick with waits)
 coroutine.resume(coroutine.create(function()
- while wait(0.1) do
+ while wait(0.5) do
+  if _G.LP_LEVELREWARDS and ocR then
+   pcall(function()
+    local lv=lvlCases[lvlIdx]
+    if not lv then lvlIdx=1;return end
+    local retries=lvlRetries[lv] or 0
+    if retries>=5 then
+     lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
+     return
+    end
+    -- Try open level case
+    local ok,r=pcall(function() return ocR:InvokeServer(lv,1,false,false) end)
+    dlog("LVL["..lvlIdx.."] "..lv..": ok="..tostring(ok).." r="..tostring(r))
+    if ok and r and r~=false and r~="" and r~=0 then
+     log("LEVEL "..lv.." OPENED!")
+     st.casesOpened=st.casesOpened+1
+     lvlRetries[lv]=0;lvlOpened=true
+     quickSell()
+     wait(1)
+    else
+     lvlRetries[lv]=retries+1
+    end
+    -- Also try claim via CheckCooldown
+    if ccR then
+     local ok2,r2=pcall(function() return ccR:InvokeServer(lv) end)
+     dlog("  CC("..lv.."): r="..tostring(r2))
+     local canClaim=false
+     if ok2 then
+      if r2==true or r2==0 or r2=="ready" then canClaim=true end
+      if type(r2)=="number" and r2<=0 then canClaim=true end
+     end
+     if canClaim then
+      dlog("  CLAIMING "..lv)
+      if clR then pcall(function() clR:InvokeServer(lv) end);pcall(function() clR:FireServer(lv) end) end
+      if Rem then for _,rn in ipairs({"ClaimLevelReward","ClaimReward","CollectLevelReward","CollectReward","RedeemReward"}) do local rm=Rem:FindFirstChild(rn);if rm then pcall(function() rm:InvokeServer(lv) end);pcall(function() rm:FireServer(lv) end) end end end
+      log("REWARD "..lv.." CLAIMED!")
+      wait(0.5)
+     end
+    end
+    lvlIdx=lvlIdx+1;if lvlIdx>#lvlCases then lvlIdx=1 end
+   end)
+  end
+ end
+end))
+-- P1-P4: XP farm / Earn / Farm / Battles
+coroutine.resume(coroutine.create(function()
+ while wait(0.2) do
   pcall(function()
-   -- P1: LEVEL CASES (highest priority, always try first)
-   if _G.LP_LEVELREWARDS and ocR then
-    local opened=tryLevelCases()
-    if opened then quickSell();return end
-   end
-   -- P2: LEVEL REWARDS
-   if _G.LP_LEVELREWARDS then
-    local claimed=tryLevelRewards()
-    if claimed then quickSell();return end
-   end
    -- P3: XP FARM (open XP cases while bal > min balance)
    if _G.LP_XPFARM then
     local minBal=_G.LP_XP_BUDGET or 500
@@ -731,9 +734,9 @@ end))
 coroutine.resume(coroutine.create(function()
  while wait(1) do if _G.LP_ANTIAFK then pcall(function() local vu=game:GetService("VirtualUser");vu:CaptureController();vu:ClickButton2(Vector2.new()) end);wait(30) end end
 end))
--- Reset level claimed cache every 60s (in case player leveled up)
+-- Reset level retries every 30s (in case player leveled up)
 coroutine.resume(coroutine.create(function()
- while wait(60) do lvlClaimed={};dlog("LvlCache reset") end
+ while wait(30) do lvlRetries={};dlog("LvlRetries reset") end
 end))
 coroutine.resume(coroutine.create(function()
  while wait(5) do if dbgBox then pcall(function() dbgBox.Text=table.concat(DL,"\n") end) end end
